@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { BookHeart, Send, Lock, Sparkles, Clock } from "lucide-react";
+import { BookHeart, Send, Lock, Sparkles, Clock, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { submitJournal } from "@/lib/api";
+import { DEMO_STUDENT_ID } from "@/lib/user";
 
 const prompts = [
   "What's been on your mind today?",
@@ -40,13 +42,22 @@ export default function JournalPage() {
   const [text, setText] = useState("");
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
-    if (!text.trim()) return;
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
-    setText("");
-    setSelectedPrompt(null);
+  const handleSubmit = async () => {
+    if (!text.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      await submitJournal({ student_id: DEMO_STUDENT_ID, text });
+      setSubmitted(true);
+      setTimeout(() => setSubmitted(false), 3000);
+      setText("");
+      setSelectedPrompt(null);
+    } catch (err) {
+      console.error("Journal submit failed:", err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -108,11 +119,11 @@ export default function JournalPage() {
               </span>
               <Button
                 onClick={handleSubmit}
-                disabled={!text.trim()}
+                disabled={!text.trim() || submitting}
                 size="sm"
               >
-                <Send className="w-4 h-4" />
-                Submit Entry
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {submitting ? "Submitting..." : "Submit Entry"}
               </Button>
             </div>
           </div>

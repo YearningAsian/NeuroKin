@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import {
@@ -14,75 +14,19 @@ import {
   Sparkles,
   CheckCircle2,
   XCircle,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getRecommendations, submitFeedback, reportUser, type PeerRecommendation } from "@/lib/api";
+import { DEMO_STUDENT_ID } from "@/lib/user";
 
-interface Match {
-  id: string;
-  name: string;
-  score: number;
-  explanation: string;
-  shared_themes: string[];
-  icebreaker: string;
-  avatar_color: string;
-}
-
-const mockMatches: Match[] = [
-  {
-    id: "1",
-    name: "Alex T.",
-    score: 87,
-    explanation:
-      "You both express reflective journaling styles and show high interest in creative activities. Your emotional patterns suggest similar coping mechanisms.",
-    shared_themes: ["Reflection", "Creativity", "Growth"],
-    icebreaker:
-      "You both gravitate toward creative expression — have you tried any new art forms lately?",
-    avatar_color: "from-blue-400 to-indigo-500",
-  },
-  {
-    id: "2",
-    name: "Jordan M.",
-    score: 74,
-    explanation:
-      "Both of you value empathy and show steady mood patterns. You share a preference for meaningful one-on-one conversations over large groups.",
-    shared_themes: ["Empathy", "Calm", "Deep Conversations"],
-    icebreaker:
-      "You both seem like great listeners — what's a topic you could talk about for hours?",
-    avatar_color: "from-emerald-400 to-teal-500",
-  },
-  {
-    id: "3",
-    name: "Sam R.",
-    score: 68,
-    explanation:
-      "You share musical interests and similar social energy levels. Your journal entries suggest you both find comfort in routine and rhythm.",
-    shared_themes: ["Music", "Routine", "Calmness"],
-    icebreaker:
-      "Music seems important to both of you — what's been on repeat this week?",
-    avatar_color: "from-purple-400 to-pink-500",
-  },
-  {
-    id: "4",
-    name: "Riley K.",
-    score: 62,
-    explanation:
-      "You share a strong curiosity drive and preference for growth-oriented activities. Your stress response patterns are compatible.",
-    shared_themes: ["Curiosity", "Growth", "Resilience"],
-    icebreaker:
-      "You're both curious minds — learned anything surprising recently?",
-    avatar_color: "from-amber-400 to-orange-500",
-  },
-  {
-    id: "5",
-    name: "Casey W.",
-    score: 55,
-    explanation:
-      "You both show interest in volunteering and have similar social battery patterns. Your emotional tone in journals aligns on themes of kindness.",
-    shared_themes: ["Kindness", "Community", "Social Impact"],
-    icebreaker:
-      "Helping others seems to matter to both of you — got any volunteer stories?",
-    avatar_color: "from-rose-400 to-red-500",
-  },
+const avatarColors = [
+  "from-blue-400 to-indigo-500",
+  "from-emerald-400 to-teal-500",
+  "from-purple-400 to-pink-500",
+  "from-amber-400 to-orange-500",
+  "from-rose-400 to-red-500",
+  "from-cyan-400 to-blue-500",
 ];
 
 function ScoreBadge({ score }: { score: number }) {
@@ -99,9 +43,23 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
-function MatchCard({ match }: { match: Match }) {
+function MatchCard({ match, colorIdx }: { match: PeerRecommendation; colorIdx: number }) {
   const [expanded, setExpanded] = useState(false);
   const [accepted, setAccepted] = useState<boolean | null>(null);
+  const avatarColor = avatarColors[colorIdx % avatarColors.length];
+  const score = Math.round(match.compatibility_score);
+
+  const handleConnect = async () => {
+    setAccepted(true);
+    await submitFeedback(DEMO_STUDENT_ID, match.peer_id, true).catch(console.error);
+  };
+  const handleSkip = async () => {
+    setAccepted(false);
+    await submitFeedback(DEMO_STUDENT_ID, match.peer_id, false).catch(console.error);
+  };
+  const handleReport = async () => {
+    await reportUser(DEMO_STUDENT_ID, match.peer_id, "Reported from connections page").catch(console.error);
+  };
 
   if (accepted === false) return null;
 
@@ -112,15 +70,15 @@ function MatchCard({ match }: { match: Match }) {
           <div
             className={cn(
               "w-14 h-14 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-bold text-lg flex-shrink-0",
-              match.avatar_color
+              avatarColor
             )}
           >
-            {match.name[0]}
+            {match.display_name[0]}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
-              <h3 className="font-bold">{match.name}</h3>
-              <ScoreBadge score={match.score} />
+              <h3 className="font-bold">{match.display_name}</h3>
+              <ScoreBadge score={score} />
               {accepted && (
                 <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Connected
@@ -166,12 +124,12 @@ function MatchCard({ match }: { match: Match }) {
             <div>
               <div className="flex justify-between text-xs mb-1">
                 <span className="text-[var(--color-text-muted)]">Emotional Compatibility</span>
-                <span className="font-semibold">{match.score}%</span>
+                <span className="font-semibold">{score}%</span>
               </div>
               <div className="w-full h-2.5 rounded-full bg-slate-100">
                 <div
                   className="h-2.5 rounded-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-warm)] transition-all"
-                  style={{ width: `${match.score}%` }}
+                  style={{ width: `${score}%` }}
                 />
               </div>
             </div>
@@ -192,7 +150,7 @@ function MatchCard({ match }: { match: Match }) {
               <div className="flex gap-3">
                 <Button
                   size="sm"
-                  onClick={() => setAccepted(true)}
+                  onClick={handleConnect}
                   className="flex-1"
                 >
                   <Heart className="w-4 h-4" />
@@ -201,13 +159,13 @@ function MatchCard({ match }: { match: Match }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setAccepted(false)}
+                  onClick={handleSkip}
                   className="flex-1"
                 >
                   <XCircle className="w-4 h-4" />
                   Skip
                 </Button>
-                <Button variant="ghost" size="sm" className="text-[var(--color-text-muted)]">
+                <Button variant="ghost" size="sm" className="text-[var(--color-text-muted)]" onClick={handleReport}>
                   <Flag className="w-4 h-4" />
                 </Button>
               </div>
@@ -220,6 +178,30 @@ function MatchCard({ match }: { match: Match }) {
 }
 
 export default function ConnectionsPage() {
+  const [matches, setMatches] = useState<PeerRecommendation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getRecommendations(DEMO_STUDENT_ID);
+        setMatches(data);
+      } catch (err) {
+        console.error("Failed to load recommendations:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--color-accent)]" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="animate-fade-in-up">
@@ -247,14 +229,14 @@ export default function ConnectionsPage() {
       <div className="grid grid-cols-3 gap-3 animate-fade-in-up">
         <Card className="text-center">
           <CardContent className="py-4">
-            <div className="text-2xl font-bold text-[var(--color-accent)]">{mockMatches.length}</div>
+            <div className="text-2xl font-bold text-[var(--color-accent)]">{matches.length}</div>
             <div className="text-xs text-[var(--color-text-muted)]">Matches Found</div>
           </CardContent>
         </Card>
         <Card className="text-center">
           <CardContent className="py-4">
             <div className="text-2xl font-bold text-emerald-600">
-              {Math.round(mockMatches.reduce((a, b) => a + b.score, 0) / mockMatches.length)}%
+              {Math.round(matches.reduce((a, b) => a + b.compatibility_score, 0) / (matches.length || 1))}%
             </div>
             <div className="text-xs text-[var(--color-text-muted)]">Avg Compatibility</div>
           </CardContent>
@@ -262,7 +244,7 @@ export default function ConnectionsPage() {
         <Card className="text-center">
           <CardContent className="py-4">
             <div className="text-2xl font-bold text-[var(--color-primary)]">
-              {mockMatches.filter((m) => m.score >= 75).length}
+              {matches.filter((m) => m.compatibility_score >= 75).length}
             </div>
             <div className="text-xs text-[var(--color-text-muted)]">Strong Matches</div>
           </CardContent>
@@ -278,8 +260,8 @@ export default function ConnectionsPage() {
           </h2>
         </div>
         <div className="space-y-3 stagger">
-          {mockMatches.map((match) => (
-            <MatchCard key={match.id} match={match} />
+          {matches.map((match, idx) => (
+            <MatchCard key={match.peer_id} match={match} colorIdx={idx} />
           ))}
         </div>
       </div>

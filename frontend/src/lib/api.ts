@@ -25,6 +25,8 @@ export interface TwinSnapshot {
   activity_preferences: string[];
   mood_stability: number;
   social_energy: number;
+  shared_values_tags: string[];
+  schedule_overlap: number;
   last_updated: string;
 }
 

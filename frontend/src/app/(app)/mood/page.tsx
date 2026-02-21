@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { SmilePlus, Send, Sparkles } from "lucide-react";
+import { SmilePlus, Send, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { submitMood } from "@/lib/api";
+import { DEMO_STUDENT_ID } from "@/lib/user";
 
 const moods = [
   { emoji: "😊", label: "Happy", color: "bg-amber-100 border-amber-300 hover:bg-amber-200" },
@@ -24,18 +26,34 @@ export default function MoodPage() {
   const [social, setSocial] = useState(5);
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
-    if (!selectedMood) return;
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      setSelectedMood(null);
-      setEnergy(5);
-      setStress(5);
-      setSocial(5);
-      setNotes("");
-    }, 3000);
+  const handleSubmit = async () => {
+    if (!selectedMood || submitting) return;
+    setSubmitting(true);
+    try {
+      await submitMood({
+        student_id: DEMO_STUDENT_ID,
+        mood_label: selectedMood.toLowerCase(),
+        energy_level: energy,
+        stress_level: stress,
+        social_battery: social,
+        notes: notes || undefined,
+      });
+      setSubmitted(true);
+      setTimeout(() => {
+        setSubmitted(false);
+        setSelectedMood(null);
+        setEnergy(5);
+        setStress(5);
+        setSocial(5);
+        setNotes("");
+      }, 3000);
+    } catch (err) {
+      console.error("Mood submit failed:", err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -159,9 +177,9 @@ export default function MoodPage() {
 
       {/* Submit */}
       <div className="flex justify-end animate-fade-in-up">
-        <Button onClick={handleSubmit} disabled={!selectedMood} size="lg">
-          <Send className="w-4 h-4" />
-          Submit Check-in
+        <Button onClick={handleSubmit} disabled={!selectedMood || submitting} size="lg">
+          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          {submitting ? "Submitting..." : "Submit Check-in"}
         </Button>
       </div>
 

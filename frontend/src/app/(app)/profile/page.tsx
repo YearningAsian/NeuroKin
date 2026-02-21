@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import {
@@ -13,40 +14,62 @@ import {
   Settings,
   Download,
   Trash2,
+  Loader2,
 } from "lucide-react";
-
-// Mock twin data
-const twin = {
-  display_name: "Colin",
-  emotion_distribution: {
-    Joy: 0.32,
-    Calm: 0.25,
-    Curiosity: 0.18,
-    Anxiety: 0.12,
-    Sadness: 0.08,
-    Frustration: 0.05,
-  },
-  top_themes: ["Reflection", "Creativity", "Growth", "Music", "Empathy"],
-  activity_preferences: ["Creative Arts", "Reading", "Music", "Coding"],
-  mood_stability: 78,
-  social_energy: 64,
-  values: ["Curiosity", "Kindness", "Growth", "Honesty"],
-  journal_count: 12,
-  checkin_count: 24,
-  days_active: 14,
-  last_updated: "2 minutes ago",
-};
+import { getTwin, type TwinSnapshot } from "@/lib/api";
+import { DEMO_STUDENT_ID } from "@/lib/user";
 
 const emotionColors: Record<string, string> = {
-  Joy: "bg-amber-400",
-  Calm: "bg-emerald-400",
-  Curiosity: "bg-blue-400",
-  Anxiety: "bg-purple-400",
-  Sadness: "bg-indigo-400",
-  Frustration: "bg-red-400",
+  joy: "bg-amber-400",
+  calm: "bg-emerald-400",
+  curiosity: "bg-blue-400",
+  anxiety: "bg-purple-400",
+  sadness: "bg-indigo-400",
+  frustration: "bg-red-400",
+  determination: "bg-orange-400",
+  empathy: "bg-pink-400",
+  hope: "bg-cyan-400",
+  excitement: "bg-rose-400",
+  nostalgia: "bg-violet-400",
+  reflection: "bg-teal-400",
+  gratitude: "bg-lime-400",
 };
 
 export default function ProfilePage() {
+  const [twin, setTwin] = useState<TwinSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const t = await getTwin(DEMO_STUDENT_ID);
+        setTwin(t);
+      } catch (err) {
+        console.error("Failed to load twin:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+      </div>
+    );
+  }
+
+  if (!twin) {
+    return (
+      <div className="text-center py-16">
+        <Brain className="w-12 h-12 text-[var(--color-text-muted)] mx-auto mb-4" />
+        <h2 className="text-xl font-bold mb-2">No Twin Yet</h2>
+        <p className="text-[var(--color-text-muted)]">Submit a journal entry or mood check-in to build your Emotional Twin.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="animate-fade-in-up">
@@ -56,7 +79,7 @@ export default function ProfilePage() {
         </h1>
         <p className="text-[var(--color-text-muted)] mt-1">
           A dynamic, AI-built representation of your emotional landscape. Updated{" "}
-          <span className="font-medium">{twin.last_updated}</span>.
+          <span className="font-medium">{new Date(twin.last_updated).toLocaleDateString()}</span>.
         </p>
       </div>
 
@@ -70,7 +93,7 @@ export default function ProfilePage() {
             <div>
               <h2 className="text-2xl font-extrabold">{twin.display_name}&apos;s Twin</h2>
               <p className="text-sm text-[var(--color-text-muted)]">
-                {twin.days_active} days active · {twin.journal_count} journal entries · {twin.checkin_count} check-ins
+                {twin.top_themes.length} themes · {twin.activity_preferences.length} activities
               </p>
             </div>
           </div>
@@ -78,23 +101,23 @@ export default function ProfilePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white/80 rounded-xl p-4 text-center">
               <Activity className="w-6 h-6 text-emerald-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold">{twin.mood_stability}%</div>
+              <div className="text-2xl font-bold">{Math.round(twin.mood_stability * 100)}%</div>
               <div className="text-xs text-[var(--color-text-muted)]">Mood Stability</div>
             </div>
             <div className="bg-white/80 rounded-xl p-4 text-center">
               <Zap className="w-6 h-6 text-blue-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold">{twin.social_energy}%</div>
+              <div className="text-2xl font-bold">{Math.round(twin.social_energy)}%</div>
               <div className="text-xs text-[var(--color-text-muted)]">Social Energy</div>
             </div>
             <div className="bg-white/80 rounded-xl p-4 text-center">
               <TrendingUp className="w-6 h-6 text-[var(--color-primary)] mx-auto mb-2" />
-              <div className="text-2xl font-bold">{twin.journal_count}</div>
-              <div className="text-xs text-[var(--color-text-muted)]">Journal Entries</div>
+              <div className="text-2xl font-bold">{twin.top_themes.length}</div>
+              <div className="text-xs text-[var(--color-text-muted)]">Themes</div>
             </div>
             <div className="bg-white/80 rounded-xl p-4 text-center">
               <Users className="w-6 h-6 text-purple-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold">{twin.checkin_count}</div>
-              <div className="text-xs text-[var(--color-text-muted)]">Mood Check-ins</div>
+              <div className="text-2xl font-bold">{twin.activity_preferences.length}</div>
+              <div className="text-xs text-[var(--color-text-muted)]">Activities</div>
             </div>
           </div>
         </CardContent>
@@ -178,7 +201,7 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {twin.values.map((v) => (
+                {(twin.shared_values_tags ?? []).map((v) => (
                   <span
                     key={v}
                     className="text-sm px-4 py-2 rounded-full bg-emerald-50 text-emerald-700 font-medium border border-emerald-200"

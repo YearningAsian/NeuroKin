@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
@@ -11,24 +12,10 @@ import {
   Brain,
   Sparkles,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
-
-// Mock data — in production this would come from the API
-const twin = {
-  mood_stability: 78,
-  social_energy: 64,
-  top_themes: ["Reflection", "Creativity", "Growth"],
-  recent_mood: "Calm",
-  recent_mood_emoji: "😌",
-  journal_count: 12,
-  match_count: 3,
-};
-
-const recentMatches = [
-  { name: "Alex T.", score: 87, themes: ["Creative", "Reflective"] },
-  { name: "Jordan M.", score: 74, themes: ["Growth", "Empathy"] },
-  { name: "Sam R.", score: 68, themes: ["Music", "Calm"] },
-];
+import { getTwin, getRecommendations, type TwinSnapshot, type PeerRecommendation } from "@/lib/api";
+import { DEMO_STUDENT_ID } from "@/lib/user";
 
 const moodHistory = [
   { day: "Mon", label: "😊", value: 80 },
@@ -41,6 +28,35 @@ const moodHistory = [
 ];
 
 export default function DashboardPage() {
+  const [twin, setTwin] = useState<TwinSnapshot | null>(null);
+  const [recentMatches, setRecentMatches] = useState<PeerRecommendation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [t, r] = await Promise.all([
+          getTwin(DEMO_STUDENT_ID),
+          getRecommendations(DEMO_STUDENT_ID),
+        ]);
+        setTwin(t);
+        setRecentMatches(r.slice(0, 3));
+      } catch (err) {
+        console.error("Dashboard fetch failed:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Greeting */}
@@ -104,30 +120,30 @@ export default function DashboardPage() {
               <div>
                 <div className="flex justify-between text-sm mb-2">
                   <span className="text-[var(--color-text-muted)]">Mood Stability</span>
-                  <span className="font-semibold">{twin.mood_stability}%</span>
+                  <span className="font-semibold">{Math.round((twin?.mood_stability ?? 0) * 100)}%</span>
                 </div>
                 <div className="w-full h-3 rounded-full bg-slate-100">
                   <div
                     className="h-3 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all"
-                    style={{ width: `${twin.mood_stability}%` }}
+                    style={{ width: `${(twin?.mood_stability ?? 0) * 100}%` }}
                   />
                 </div>
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-2">
                   <span className="text-[var(--color-text-muted)]">Social Energy</span>
-                  <span className="font-semibold">{twin.social_energy}%</span>
+                  <span className="font-semibold">{Math.round(twin?.social_energy ?? 0)}%</span>
                 </div>
                 <div className="w-full h-3 rounded-full bg-slate-100">
                   <div
                     className="h-3 rounded-full bg-gradient-to-r from-blue-400 to-blue-500 transition-all"
-                    style={{ width: `${twin.social_energy}%` }}
+                    style={{ width: `${twin?.social_energy ?? 0}%` }}
                   />
                 </div>
               </div>
             </div>
             <div className="mt-6 flex flex-wrap gap-2">
-              {twin.top_themes.map((t) => (
+              {(twin?.top_themes ?? []).map((t) => (
                 <span
                   key={t}
                   className="text-xs px-3 py-1.5 rounded-full bg-[var(--color-primary-light)] text-amber-800 font-medium"
@@ -138,10 +154,10 @@ export default function DashboardPage() {
             </div>
             <div className="mt-6 flex items-center gap-4 text-sm text-[var(--color-text-muted)]">
               <div className="flex items-center gap-1.5">
-                <BookHeart className="w-4 h-4" /> {twin.journal_count} entries
+                <BookHeart className="w-4 h-4" /> {twin?.top_themes.length ?? 0} themes
               </div>
               <div className="flex items-center gap-1.5">
-                <Users className="w-4 h-4" /> {twin.match_count} connections
+                <Users className="w-4 h-4" /> {recentMatches.length} connections
               </div>
             </div>
           </CardContent>
@@ -153,8 +169,8 @@ export default function DashboardPage() {
             <CardTitle>Current Mood</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center">
-            <div className="text-6xl mb-3 pulse-soft">{twin.recent_mood_emoji}</div>
-            <div className="text-lg font-semibold">{twin.recent_mood}</div>
+            <div className="text-6xl mb-3 pulse-soft">😌</div>
+            <div className="text-lg font-semibold">{twin?.display_name ?? "You"}</div>
             <Link href="/mood" className="mt-4">
               <Button variant="secondary" size="sm">
                 Update mood <SmilePlus className="w-4 h-4" />
@@ -212,16 +228,16 @@ export default function DashboardPage() {
           <div className="space-y-3">
             {recentMatches.map((match) => (
               <div
-                key={match.name}
+                key={match.peer_id}
                 className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
               >
                 <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-warm)] flex items-center justify-center text-white font-bold text-sm">
-                  {match.name[0]}
+                  {match.display_name[0]}
                 </div>
                 <div className="flex-1">
-                  <div className="font-semibold text-sm">{match.name}</div>
+                  <div className="font-semibold text-sm">{match.display_name}</div>
                   <div className="flex gap-1.5 mt-1">
-                    {match.themes.map((t) => (
+                    {match.shared_themes.map((t) => (
                       <span
                         key={t}
                         className="text-xs px-2 py-0.5 rounded-full bg-white border border-[var(--color-border)]"
@@ -233,7 +249,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-[var(--color-accent)]">
-                    {match.score}%
+                    {Math.round(match.compatibility_score)}%
                   </div>
                   <div className="text-xs text-[var(--color-text-muted)]">compatible</div>
                 </div>

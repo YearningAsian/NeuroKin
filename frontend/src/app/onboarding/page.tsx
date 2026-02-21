@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import {
   Brain,
@@ -18,8 +19,11 @@ import {
   BookOpen,
   Heart,
   Users,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { submitJournal, submitMood } from "@/lib/api";
+import { DEMO_STUDENT_ID } from "@/lib/user";
 
 const moodOptions = [
   { emoji: "😊", label: "Happy", color: "bg-amber-100 border-amber-300" },
@@ -63,6 +67,8 @@ export default function OnboardingPage() {
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const [selectedValues, setSelectedValues] = useState<string[]>([]);
   const [journalText, setJournalText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
 
   const toggleActivity = (label: string) => {
     setSelectedActivities((prev) =>
@@ -283,6 +289,44 @@ export default function OnboardingPage() {
   const isFirst = step === 0;
   const isLast = step === totalSteps - 1;
 
+  const finishOnboarding = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      if (selectedMood) {
+        await submitMood({
+          student_id: DEMO_STUDENT_ID,
+          mood_label: selectedMood.toLowerCase(),
+          energy_level: energyLevel,
+          stress_level: 5,
+          social_battery: socialBattery,
+        });
+      }
+      if (journalText.trim()) {
+        await submitJournal({
+          student_id: DEMO_STUDENT_ID,
+          text: journalText,
+          mood_label: selectedMood?.toLowerCase(),
+          tags: [...selectedActivities, ...selectedValues],
+        });
+      }
+      setStep(step + 1);
+    } catch (err) {
+      console.error("Onboarding submit failed:", err);
+      setStep(step + 1);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleNext = () => {
+    if (step === totalSteps - 2) {
+      finishOnboarding();
+    } else {
+      setStep(step + 1);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[var(--color-surface-soft)] flex flex-col">
       {/* Progress bar */}
@@ -310,9 +354,12 @@ export default function OnboardingPage() {
             <span className="text-sm text-[var(--color-text-muted)]">
               {step} of {totalSteps - 2}
             </span>
-            <Button onClick={() => setStep(step + 1)}>
-              {step === totalSteps - 2 ? "Finish" : "Next"}{" "}
-              <ArrowRight className="w-4 h-4" />
+            <Button onClick={handleNext} disabled={submitting}>
+              {submitting ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+              ) : (
+                <>{step === totalSteps - 2 ? "Finish" : "Next"} <ArrowRight className="w-4 h-4" /></>
+              )}
             </Button>
           </div>
         </div>

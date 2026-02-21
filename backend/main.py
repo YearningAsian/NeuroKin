@@ -11,19 +11,22 @@ Architecture:
 
 All heavy lifting (embeddings, LLM calls) runs through Snowflake Cortex.
 Adding new data fields = update the Pydantic model + Snowflake table. No routing changes.
+
+Set DEMO_MODE=1 to run entirely in-memory without Snowflake credentials.
 """
 
 from __future__ import annotations
 
 import os
 import json
+import math
+import random
 import hashlib
 import logging
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
-import snowflake.connector
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,6 +39,11 @@ from pydantic import BaseModel, Field
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("neurokin")
+
+DEMO_MODE = os.environ.get("DEMO_MODE", "1") == "1"
+
+if not DEMO_MODE:
+    import snowflake.connector  # only import when actually needed
 
 app = FastAPI(
     title="NeuroKin API",
@@ -51,10 +59,21 @@ app.add_middleware(
 )
 
 # ---------------------------------------------------------------------------
-# Snowflake Connection Pool
+# Snowflake Connection Pool (production) / In-Memory Store (demo)
 # ---------------------------------------------------------------------------
 
-def _sf_connect() -> snowflake.connector.SnowflakeConnection:
+# === In-memory demo store ===
+_demo_store: dict[str, dict] = {
+    "students": {},
+    "journal_entries": [],
+    "mood_checkins": [],
+    "twin_snapshots": {},
+    "matches": [],
+    "safety_reports": [],
+}
+
+
+def _sf_connect():
     """Return a Snowflake connection using env-based credentials."""
     return snowflake.connector.connect(
         account=os.environ["SNOWFLAKE_ACCOUNT"],
@@ -68,7 +87,9 @@ def _sf_connect() -> snowflake.connector.SnowflakeConnection:
 
 
 def _execute(sql: str, params: tuple = (), *, fetch: bool = False):
-    """Execute a query against Snowflake."""
+    """Execute a query against Snowflake (skipped in DEMO_MODE)."""
+    if DEMO_MODE:
+        return [] if fetch else 0
     conn = _sf_connect()
     try:
         cur = conn.cursor()
@@ -164,11 +185,115 @@ class ReportPayload(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Snowflake Cortex Helpers
+# Snowflake Cortex Helpers (with demo-mode fallbacks)
 # ---------------------------------------------------------------------------
+
+_EMB_DIM = 768  # Snowflake Arctic Embed dimension
+
+_EMOTION_KEYWORDS: dict[str, list[str]] = {
+    "joy": ["happy", "grateful", "excited", "smile", "great", "love", "wonderful", "glad", "enjoy", "fun"],
+    "calm": ["calm", "peace", "relax", "serene", "quiet", "mindful", "gentle", "steady", "content", "still"],
+    "curiosity": ["curious", "wonder", "learn", "explore", "interesting", "discover", "why", "how", "think", "new"],
+    "anxiety": ["anxious", "worry", "nervous", "stress", "overwhelm", "panic", "fear", "tense", "uneasy", "dread"],
+    "sadness": ["sad", "lonely", "down", "cry", "miss", "hurt", "grief", "empty", "tired", "exhausted"],
+    "frustration": ["frustrated", "angry", "annoyed", "stuck", "unfair", "hate", "irritate", "bother", "mad", "upset"],
+}
+
+_THEME_KEYWORDS: dict[str, list[str]] = {
+    "Reflection": ["think", "reflect", "journal", "realize", "understand", "perspective", "looking back"],
+    "Creativity": ["art", "create", "design", "music", "write", "paint", "imagine", "creative"],
+    "Growth": ["grow", "improve", "learn", "better", "progress", "goal", "challenge", "develop"],
+    "Social": ["friend", "talk", "hang out", "group", "social", "people", "together", "conversation"],
+    "Nature": ["nature", "outside", "walk", "park", "tree", "fresh air", "garden", "hike"],
+    "Music": ["music", "song", "listen", "play", "band", "guitar", "piano", "sing"],
+    "Fitness": ["exercise", "run", "gym", "sport", "workout", "yoga", "stretch", "active"],
+    "Family": ["family", "parent", "sibling", "home", "mom", "dad", "brother", "sister"],
+    "Academic": ["school", "class", "study", "homework", "exam", "project", "grade", "teacher"],
+    "Empathy": ["empathy", "kind", "care", "support", "help", "understand", "compassion", "listen"],
+}
+
+
+def _demo_embed(text: str) -> list[float]:
+    """Generate a deterministic pseudo-embedding from text for demo mode.
+
+    Strategy: allocate embedding dimensions to known categories (emotions, themes)
+    so that students sharing categories get high cosine similarity.
+    """
+    # Start with small seeded noise (gives each text a unique fingerprint)
+    random.seed(hashlib.md5(text.encode()).hexdigest())
+    vec = [random.gauss(0, 0.05) for _ in range(_EMB_DIM)]
+
+    lower = text.lower()
+
+    # Map known categories to fixed dimension ranges with strong signal
+    all_categories: list[tuple[str, list[str]]] = (
+        [(k, v) for k, v in _EMOTION_KEYWORDS.items()]
+        + [(k, v) for k, v in _THEME_KEYWORDS.items()]
+    )
+    dims_per_cat = max(1, _EMB_DIM // max(len(all_categories), 1))
+
+    for idx, (cat, keywords) in enumerate(all_categories):
+        hits = sum(1 for w in keywords if w in lower)
+        if hits > 0:
+            strength = min(hits * 0.4, 1.5)
+            start = (idx * dims_per_cat) % _EMB_DIM
+            for d in range(dims_per_cat):
+                vec[(start + d) % _EMB_DIM] += strength
+
+    # Normalise to unit vector
+    norm = math.sqrt(sum(x * x for x in vec))
+    return [x / norm for x in vec] if norm > 0 else vec
+
+
+def _demo_extract(text: str) -> dict:
+    """Simulate Cortex COMPLETE emotion/theme extraction for demo mode."""
+    lower = text.lower()
+    emotions: dict[str, float] = {}
+    for emotion, words in _EMOTION_KEYWORDS.items():
+        score = sum(1 for w in words if w in lower)
+        if score > 0:
+            emotions[emotion] = round(min(score * 0.15, 1.0), 3)
+    if not emotions:
+        emotions = {"calm": 0.5, "curiosity": 0.3}
+    # normalise
+    total = sum(emotions.values())
+    emotions = {k: round(v / total, 3) for k, v in emotions.items()}
+
+    themes = [t for t, words in _THEME_KEYWORDS.items() if any(w in lower for w in words)]
+    if not themes:
+        themes = ["Reflection"]
+
+    social_hint = 50
+    if any(w in lower for w in ["friend", "social", "group", "talk", "people"]):
+        social_hint = 75
+    elif any(w in lower for w in ["alone", "quiet", "solitude", "introvert"]):
+        social_hint = 25
+
+    return {"emotions": emotions, "themes": themes[:5], "social_energy_hint": social_hint}
+
+
+def _demo_explain(me_themes: list, peer_themes: list, shared: list, score: float) -> dict:
+    """Simulate Cortex COMPLETE explanation generation for demo mode."""
+    if shared:
+        explanation = f"You both connect through themes like {', '.join(shared[:3])}. Your emotional patterns suggest you'd understand each other well."
+    else:
+        explanation = f"Your emotional profiles complement each other with a {score}% compatibility, suggesting meaningful connection potential."
+    icebreakers = [
+        "What's something you've been curious about lately?",
+        "What's a small thing that made your day better recently?",
+        "If you could learn any skill instantly, what would it be?",
+        "What's something you're proud of that most people don't know about?",
+        "What kind of music do you listen to when you need to recharge?",
+    ]
+    random.seed(int(score * 100))
+    icebreaker = random.choice(icebreakers)
+    return {"explanation": explanation, "icebreaker": icebreaker}
+
 
 def cortex_embed(text: str) -> list[float]:
     """Generate a 768-d embedding via Snowflake Cortex EMBED_TEXT_768."""
+    if DEMO_MODE:
+        return _demo_embed(text)
     rows = _execute(
         "SELECT SNOWFLAKE.CORTEX.EMBED_TEXT_768('snowflake-arctic-embed-m-v1.5', %s) AS emb",
         (text,),
@@ -180,6 +305,8 @@ def cortex_embed(text: str) -> list[float]:
 
 def cortex_sentiment(text: str) -> dict:
     """Return sentiment analysis via Snowflake Cortex SENTIMENT."""
+    if DEMO_MODE:
+        return _demo_extract(text)
     rows = _execute(
         "SELECT SNOWFLAKE.CORTEX.SENTIMENT(%s) AS sent",
         (text,),
@@ -191,6 +318,8 @@ def cortex_sentiment(text: str) -> dict:
 
 def cortex_summarize(text: str) -> str:
     """Summarize text via Snowflake Cortex SUMMARIZE."""
+    if DEMO_MODE:
+        return text[:200] + "..." if len(text) > 200 else text
     rows = _execute(
         "SELECT SNOWFLAKE.CORTEX.SUMMARIZE(%s) AS summary",
         (text,),
@@ -201,6 +330,9 @@ def cortex_summarize(text: str) -> str:
 
 def cortex_complete(prompt: str, model: str = "mistral-large2") -> str:
     """Run an LLM completion via Snowflake Cortex COMPLETE."""
+    if DEMO_MODE:
+        # In demo mode the chains call their own fallback logic
+        return "{}"
     rows = _execute(
         "SELECT SNOWFLAKE.CORTEX.COMPLETE(%s, %s) AS result",
         (model, prompt),
@@ -295,8 +427,11 @@ class TwinBuilderChain:
         # Step 1 — Embedding
         embedding = cortex_embed(text)
 
-        # Step 2 — Theme & emotion extraction via Cortex LLM
-        extraction_prompt = f"""Analyze the following student journal entry. Return valid JSON only.
+        # Step 2 — Theme & emotion extraction
+        if DEMO_MODE:
+            extracted = _demo_extract(text)
+        else:
+            extraction_prompt = f"""Analyze the following student journal entry. Return valid JSON only.
 {{
   "emotions": {{"emotion_name": probability_float, ...}},
   "themes": ["theme1", "theme2", ...],
@@ -306,11 +441,11 @@ class TwinBuilderChain:
 Journal entry:
 \"\"\"{text}\"\"\"
 """
-        raw_json = cortex_complete(extraction_prompt)
-        try:
-            extracted = json.loads(raw_json)
-        except json.JSONDecodeError:
-            extracted = {"emotions": {}, "themes": [], "social_energy_hint": 50}
+            raw_json = cortex_complete(extraction_prompt)
+            try:
+                extracted = json.loads(raw_json)
+            except json.JSONDecodeError:
+                extracted = {"emotions": {}, "themes": [], "social_energy_hint": 50}
 
         # Step 3 — Merge with existing twin (rolling average)
         if existing_twin is None:
@@ -351,54 +486,55 @@ Journal entry:
                 "last_updated": datetime.now(timezone.utc),
             })
 
-        # Step 4 — Persist to Snowflake
-        _execute(
-            """
-            MERGE INTO twin_snapshots AS tgt
-            USING (SELECT %s AS student_id) AS src
-            ON tgt.student_id = src.student_id
-            WHEN MATCHED THEN UPDATE SET
-                twin_embedding   = PARSE_JSON(%s),
-                emotion_distribution = PARSE_JSON(%s),
-                top_themes       = PARSE_JSON(%s),
-                activity_preferences = PARSE_JSON(%s),
-                mood_stability   = %s,
-                social_energy    = %s,
-                shared_values_tags = PARSE_JSON(%s),
-                schedule_overlap = %s,
-                last_updated     = %s
-            WHEN NOT MATCHED THEN INSERT (
-                student_id, twin_embedding, emotion_distribution, top_themes,
-                activity_preferences, mood_stability, social_energy,
-                shared_values_tags, schedule_overlap, last_updated
-            ) VALUES (%s, PARSE_JSON(%s), PARSE_JSON(%s), PARSE_JSON(%s),
-                      PARSE_JSON(%s), %s, %s, PARSE_JSON(%s), %s, %s)
-            """,
-            (
-                twin.student_id,
-                # UPDATE SET
-                json.dumps(twin.twin_embedding),
-                json.dumps(twin.emotion_distribution),
-                json.dumps(twin.top_themes),
-                json.dumps(twin.activity_preferences),
-                twin.mood_stability,
-                twin.social_energy,
-                json.dumps(twin.shared_values_tags),
-                twin.schedule_overlap,
-                twin.last_updated.isoformat(),
-                # INSERT VALUES
-                twin.student_id,
-                json.dumps(twin.twin_embedding),
-                json.dumps(twin.emotion_distribution),
-                json.dumps(twin.top_themes),
-                json.dumps(twin.activity_preferences),
-                twin.mood_stability,
-                twin.social_energy,
-                json.dumps(twin.shared_values_tags),
-                twin.schedule_overlap,
-                twin.last_updated.isoformat(),
-            ),
-        )
+        # Step 4 — Persist
+        if DEMO_MODE:
+            _demo_store["twin_snapshots"][twin.student_id] = twin
+        else:
+            _execute(
+                """
+                MERGE INTO twin_snapshots AS tgt
+                USING (SELECT %s AS student_id) AS src
+                ON tgt.student_id = src.student_id
+                WHEN MATCHED THEN UPDATE SET
+                    twin_embedding   = PARSE_JSON(%s),
+                    emotion_distribution = PARSE_JSON(%s),
+                    top_themes       = PARSE_JSON(%s),
+                    activity_preferences = PARSE_JSON(%s),
+                    mood_stability   = %s,
+                    social_energy    = %s,
+                    shared_values_tags = PARSE_JSON(%s),
+                    schedule_overlap = %s,
+                    last_updated     = %s
+                WHEN NOT MATCHED THEN INSERT (
+                    student_id, twin_embedding, emotion_distribution, top_themes,
+                    activity_preferences, mood_stability, social_energy,
+                    shared_values_tags, schedule_overlap, last_updated
+                ) VALUES (%s, PARSE_JSON(%s), PARSE_JSON(%s), PARSE_JSON(%s),
+                          PARSE_JSON(%s), %s, %s, PARSE_JSON(%s), %s, %s)
+                """,
+                (
+                    twin.student_id,
+                    json.dumps(twin.twin_embedding),
+                    json.dumps(twin.emotion_distribution),
+                    json.dumps(twin.top_themes),
+                    json.dumps(twin.activity_preferences),
+                    twin.mood_stability,
+                    twin.social_energy,
+                    json.dumps(twin.shared_values_tags),
+                    twin.schedule_overlap,
+                    twin.last_updated.isoformat(),
+                    twin.student_id,
+                    json.dumps(twin.twin_embedding),
+                    json.dumps(twin.emotion_distribution),
+                    json.dumps(twin.top_themes),
+                    json.dumps(twin.activity_preferences),
+                    twin.mood_stability,
+                    twin.social_energy,
+                    json.dumps(twin.shared_values_tags),
+                    twin.schedule_overlap,
+                    twin.last_updated.isoformat(),
+                ),
+            )
 
         return twin
 
@@ -420,34 +556,45 @@ class MatchRetrievalChain:
         logger.info("MatchRetrievalChain.run  student=%s", student_id)
 
         # 1 — Load own twin
-        rows = _execute(
-            "SELECT * FROM twin_snapshots WHERE student_id = %s",
-            (student_id,),
-            fetch=True,
-        )
-        if not rows:
-            return []
-        me = _row_to_twin(rows[0])
+        if DEMO_MODE:
+            me = _demo_store["twin_snapshots"].get(student_id)
+            if me is None:
+                return []
+        else:
+            rows = _execute(
+                "SELECT * FROM twin_snapshots WHERE student_id = %s",
+                (student_id,),
+                fetch=True,
+            )
+            if not rows:
+                return []
+            me = _row_to_twin(rows[0])
 
-        # 2 — Candidate retrieval via Cortex Search vector similarity
-        #     We use Snowflake's VECTOR_COSINE_SIMILARITY for a pre-filter.
-        candidates = _execute(
-            f"""
-            SELECT *,
-                   VECTOR_COSINE_SIMILARITY(twin_embedding, PARSE_JSON(%s)::VECTOR(FLOAT, 768)) AS vec_sim
-            FROM twin_snapshots
-            WHERE student_id != %s
-            ORDER BY vec_sim DESC
-            LIMIT %s
-            """,
-            (json.dumps(me.twin_embedding), student_id, top_k * 2),
-            fetch=True,
-        )
+        # 2 — Candidate retrieval
+        if DEMO_MODE:
+            # In demo mode compute compatibility against all other twins in memory
+            all_twins = [
+                t for sid, t in _demo_store["twin_snapshots"].items()
+                if sid != student_id
+            ]
+        else:
+            candidates = _execute(
+                f"""
+                SELECT *,
+                       VECTOR_COSINE_SIMILARITY(twin_embedding, PARSE_JSON(%s)::VECTOR(FLOAT, 768)) AS vec_sim
+                FROM twin_snapshots
+                WHERE student_id != %s
+                ORDER BY vec_sim DESC
+                LIMIT %s
+                """,
+                (json.dumps(me.twin_embedding), student_id, top_k * 2),
+                fetch=True,
+            )
+            all_twins = [_row_to_twin(row) for row in candidates]
 
         # 3 — Full compatibility scoring
         scored: list[tuple[TwinSnapshot, float]] = []
-        for row in candidates:
-            peer = _row_to_twin(row)
+        for peer in all_twins:
             score = compute_compatibility(me, peer)
             if score >= 50.0:
                 scored.append((peer, score))
@@ -480,6 +627,10 @@ class ExplanationChain:
 
     @staticmethod
     def run(me: TwinSnapshot, peer: TwinSnapshot, score: float, shared: list[str]) -> tuple[str, str]:
+        if DEMO_MODE:
+            result = _demo_explain(me.top_themes, peer.top_themes, shared, score)
+            return result.get("explanation", ""), result.get("icebreaker", "")
+
         prompt = f"""You are NeuroKin, an emotionally intelligent student connection assistant.
 Given two student profiles (no raw journal text), explain why they are a good match
 and suggest one engaging icebreaker question.
@@ -615,9 +766,106 @@ CREATE TABLE IF NOT EXISTS safety_reports (
 """
 
 
+def _seed_demo_data():
+    """Populate _demo_store with realistic sample students so the API is immediately useful."""
+    profiles = [
+        {
+            "id": "demo-alex",
+            "name": "Alex",
+            "emotions": {"curiosity": 0.35, "joy": 0.25, "determination": 0.20, "calm": 0.12, "anxiety": 0.08},
+            "themes": ["artificial intelligence", "music", "hiking", "mindfulness", "photography"],
+            "activities": ["coding", "guitar", "trail running", "reading"],
+            "values": ["creativity", "growth", "authenticity"],
+            "energy": 72,
+            "mood_stability": 0.78,
+            "schedule": 0.6,
+        },
+        {
+            "id": "demo-jordan",
+            "name": "Jordan",
+            "emotions": {"empathy": 0.30, "calm": 0.25, "curiosity": 0.20, "hope": 0.15, "nostalgia": 0.10},
+            "themes": ["psychology", "creative writing", "sustainability", "yoga", "mindfulness"],
+            "activities": ["journaling", "yoga", "volunteering", "reading"],
+            "values": ["empathy", "sustainability", "authenticity"],
+            "energy": 55,
+            "mood_stability": 0.85,
+            "schedule": 0.5,
+        },
+        {
+            "id": "demo-sam",
+            "name": "Sam",
+            "emotions": {"excitement": 0.30, "joy": 0.25, "determination": 0.20, "anxiety": 0.15, "curiosity": 0.10},
+            "themes": ["entrepreneurship", "fitness", "travel", "cooking", "music"],
+            "activities": ["basketball", "cooking", "guitar", "coding"],
+            "values": ["ambition", "teamwork", "growth"],
+            "energy": 85,
+            "mood_stability": 0.65,
+            "schedule": 0.7,
+        },
+        {
+            "id": "demo-riley",
+            "name": "Riley",
+            "emotions": {"calm": 0.30, "curiosity": 0.25, "joy": 0.15, "reflection": 0.15, "gratitude": 0.15},
+            "themes": ["astronomy", "reading", "meditation", "art history", "hiking"],
+            "activities": ["stargazing", "painting", "reading", "trail running"],
+            "values": ["knowledge", "patience", "creativity"],
+            "energy": 45,
+            "mood_stability": 0.90,
+            "schedule": 0.4,
+        },
+        {
+            "id": "demo-casey",
+            "name": "Casey",
+            "emotions": {"determination": 0.30, "curiosity": 0.25, "anxiety": 0.20, "hope": 0.15, "frustration": 0.10},
+            "themes": ["computer science", "gaming", "music production", "artificial intelligence", "robotics"],
+            "activities": ["coding", "gaming", "guitar", "reading"],
+            "values": ["innovation", "creativity", "growth"],
+            "energy": 68,
+            "mood_stability": 0.70,
+            "schedule": 0.8,
+        },
+        {
+            "id": "demo-morgan",
+            "name": "Morgan",
+            "emotions": {"empathy": 0.35, "joy": 0.20, "nostalgia": 0.15, "calm": 0.15, "hope": 0.15},
+            "themes": ["social justice", "poetry", "dance", "community", "mindfulness"],
+            "activities": ["dance", "volunteering", "journaling", "yoga"],
+            "values": ["justice", "community", "empathy"],
+            "energy": 62,
+            "mood_stability": 0.75,
+            "schedule": 0.5,
+        },
+    ]
+
+    for p in profiles:
+        # Build a pseudo-text to generate a deterministic embedding
+        seed_text = f"{p['name']} cares about {', '.join(p['themes'][:3])}. " \
+                    f"Values: {', '.join(p['values'])}. Activities: {', '.join(p['activities'])}."
+        twin = TwinSnapshot(
+            student_id=p["id"],
+            display_name=p["name"],
+            twin_embedding=_demo_embed(seed_text),
+            emotion_distribution=p["emotions"],
+            top_themes=p["themes"],
+            activity_preferences=p["activities"],
+            mood_stability=p["mood_stability"],
+            social_energy=float(p["energy"]),
+            shared_values_tags=p["values"],
+            schedule_overlap=p["schedule"],
+            last_updated=datetime.now(timezone.utc),
+        )
+        _demo_store["twin_snapshots"][p["id"]] = twin
+
+    logger.info("Seeded %d demo students.", len(profiles))
+
+
 @app.on_event("startup")
 async def _bootstrap():
     """Run DDL on startup — safe to re-run (CREATE IF NOT EXISTS)."""
+    if DEMO_MODE:
+        logger.info("DEMO_MODE — seeding in-memory sample students…")
+        _seed_demo_data()
+        return
     try:
         for stmt in [s.strip() for s in BOOTSTRAP_SQL.split(";") if s.strip()]:
             _execute(stmt)
@@ -636,65 +884,82 @@ async def post_journal(entry: JournalEntry):
     Submit a journal entry.
     Triggers: embedding → TwinBuilderChain → twin_snapshots update.
     """
-    # Persist the raw journal (encrypted column)
     embedding = cortex_embed(entry.text)
-    _execute(
-        """
-        INSERT INTO journal_entries (student_id, text_encrypted, mood_label, tags, embedding)
-        VALUES (%s, %s, %s, PARSE_JSON(%s), PARSE_JSON(%s))
-        """,
-        (
-            entry.student_id,
-            entry.text,  # In production: encrypt before storage
-            entry.mood_label.value if entry.mood_label else None,
-            json.dumps(entry.tags),
-            json.dumps(embedding),
-        ),
-    )
 
-    # Load existing twin
-    rows = _execute(
-        "SELECT * FROM twin_snapshots WHERE student_id = %s",
-        (entry.student_id,),
-        fetch=True,
-    )
-    existing = _row_to_twin(rows[0]) if rows else None
+    if DEMO_MODE:
+        _demo_store["journal_entries"].append({
+            "student_id": entry.student_id,
+            "text": entry.text,
+            "mood_label": entry.mood_label.value if entry.mood_label else None,
+            "tags": entry.tags,
+            "embedding": embedding,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        existing = _demo_store["twin_snapshots"].get(entry.student_id)
+    else:
+        _execute(
+            """
+            INSERT INTO journal_entries (student_id, text_encrypted, mood_label, tags, embedding)
+            VALUES (%s, %s, %s, PARSE_JSON(%s), PARSE_JSON(%s))
+            """,
+            (
+                entry.student_id,
+                entry.text,
+                entry.mood_label.value if entry.mood_label else None,
+                json.dumps(entry.tags),
+                json.dumps(embedding),
+            ),
+        )
+        rows = _execute(
+            "SELECT * FROM twin_snapshots WHERE student_id = %s",
+            (entry.student_id,),
+            fetch=True,
+        )
+        existing = _row_to_twin(rows[0]) if rows else None
 
-    # Run TwinBuilderChain
     TwinBuilderChain.run(entry.student_id, entry.text, existing)
-
     return {"status": "ok", "twin_updated": True}
 
 
 @app.post("/mood", tags=["Ingestion"])
 async def post_mood(checkin: MoodCheckIn):
     """Submit a mood check-in.  Updates the twin's mood/energy dimensions."""
-    _execute(
-        """
-        INSERT INTO mood_checkins (student_id, mood_label, energy_level, stress_level, social_battery, notes)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        """,
-        (
-            checkin.student_id,
-            checkin.mood_label.value,
-            checkin.energy_level,
-            checkin.stress_level,
-            checkin.social_battery,
-            checkin.notes,
-        ),
-    )
+    if DEMO_MODE:
+        _demo_store["mood_checkins"].append({
+            "student_id": checkin.student_id,
+            "mood_label": checkin.mood_label.value,
+            "energy_level": checkin.energy_level,
+            "stress_level": checkin.stress_level,
+            "social_battery": checkin.social_battery,
+            "notes": checkin.notes,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        existing = _demo_store["twin_snapshots"].get(checkin.student_id)
+    else:
+        _execute(
+            """
+            INSERT INTO mood_checkins (student_id, mood_label, energy_level, stress_level, social_battery, notes)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (
+                checkin.student_id,
+                checkin.mood_label.value,
+                checkin.energy_level,
+                checkin.stress_level,
+                checkin.social_battery,
+                checkin.notes,
+            ),
+        )
+        rows = _execute(
+            "SELECT * FROM twin_snapshots WHERE student_id = %s",
+            (checkin.student_id,),
+            fetch=True,
+        )
+        existing = _row_to_twin(rows[0]) if rows else None
 
-    # Update twin with mood signal
     mood_text = f"Mood: {checkin.mood_label.value}. Energy {checkin.energy_level}/10. Stress {checkin.stress_level}/10. Social {checkin.social_battery}/10."
     if checkin.notes:
         mood_text += f" Notes: {checkin.notes}"
-
-    rows = _execute(
-        "SELECT * FROM twin_snapshots WHERE student_id = %s",
-        (checkin.student_id,),
-        fetch=True,
-    )
-    existing = _row_to_twin(rows[0]) if rows else None
     TwinBuilderChain.run(checkin.student_id, mood_text, existing)
 
     return {"status": "ok"}
@@ -703,6 +968,13 @@ async def post_mood(checkin: MoodCheckIn):
 @app.get("/twin", response_model=TwinSnapshot, tags=["Twin"])
 async def get_twin(student_id: str = Query(...)):
     """Retrieve the current Emotional Digital Twin state."""
+    if DEMO_MODE:
+        twin = _demo_store["twin_snapshots"].get(student_id)
+        if not twin:
+            raise HTTPException(404, "Twin not found. Submit a journal or mood check-in first.")
+        twin = twin.model_copy(update={"twin_embedding": []})
+        return twin
+
     rows = _execute(
         "SELECT * FROM twin_snapshots WHERE student_id = %s",
         (student_id,),
@@ -711,7 +983,6 @@ async def get_twin(student_id: str = Query(...)):
     if not rows:
         raise HTTPException(404, "Twin not found. Submit a journal or mood check-in first.")
     twin = _row_to_twin(rows[0])
-    # Strip the raw embedding from the response (privacy)
     twin.twin_embedding = []
     return twin
 
@@ -725,39 +996,66 @@ async def get_recommendations(student_id: str = Query(...), top_k: int = Query(1
 @app.post("/feedback", tags=["Social"])
 async def post_feedback(payload: FeedbackPayload):
     """Record whether the student accepted or skipped a recommendation."""
-    _execute(
-        """
-        INSERT INTO matches (student_a, student_b, accepted)
-        VALUES (%s, %s, %s)
-        """,
-        (payload.student_id, payload.peer_id, payload.accepted),
-    )
+    record = {
+        "student_a": payload.student_id,
+        "student_b": payload.peer_id,
+        "accepted": payload.accepted,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if DEMO_MODE:
+        _demo_store["matches"].append(record)
+    else:
+        _execute(
+            """
+            INSERT INTO matches (student_a, student_b, accepted)
+            VALUES (%s, %s, %s)
+            """,
+            (payload.student_id, payload.peer_id, payload.accepted),
+        )
     return {"status": "ok"}
 
 
 @app.post("/block", tags=["Safety"])
 async def post_block(payload: BlockPayload):
     """Block a peer — they will never appear in recommendations again."""
-    _execute(
-        """
-        INSERT INTO safety_reports (reporter_id, reported_id, reason)
-        VALUES (%s, %s, 'BLOCK')
-        """,
-        (payload.student_id, payload.blocked_id),
-    )
+    record = {
+        "reporter_id": payload.student_id,
+        "reported_id": payload.blocked_id,
+        "reason": "BLOCK",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if DEMO_MODE:
+        _demo_store["safety_reports"].append(record)
+    else:
+        _execute(
+            """
+            INSERT INTO safety_reports (reporter_id, reported_id, reason)
+            VALUES (%s, %s, 'BLOCK')
+            """,
+            (payload.student_id, payload.blocked_id),
+        )
     return {"status": "ok"}
 
 
 @app.post("/report", tags=["Safety"])
 async def post_report(payload: ReportPayload):
     """Report a peer for moderation review."""
-    _execute(
-        """
-        INSERT INTO safety_reports (reporter_id, reported_id, reason)
-        VALUES (%s, %s, %s)
-        """,
-        (payload.student_id, payload.reported_id, payload.reason),
-    )
+    record = {
+        "reporter_id": payload.student_id,
+        "reported_id": payload.reported_id,
+        "reason": payload.reason,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if DEMO_MODE:
+        _demo_store["safety_reports"].append(record)
+    else:
+        _execute(
+            """
+            INSERT INTO safety_reports (reporter_id, reported_id, reason)
+            VALUES (%s, %s, %s)
+            """,
+            (payload.student_id, payload.reported_id, payload.reason),
+        )
     return {"status": "ok"}
 
 
