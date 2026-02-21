@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -44,6 +44,11 @@ const emotionColors: Record<string, string> = {
   gratitude: "bg-lime-400",
 };
 
+const twinAvatarOptions = ["Nova", "Atlas", "Echo", "Luna", "Sage", "Aster"];
+
+const getThumbUrl = (seed: string) =>
+  `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(seed)}`;
+
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const studentId = user?.studentId ?? "";
@@ -54,6 +59,37 @@ export default function ProfilePage() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [consentGranted, setConsentGranted] = useState(true);
+  const [twinName, setTwinName] = useState("My Twin");
+  const [twinSeed, setTwinSeed] = useState("Nova");
+  const [showCustomize, setShowCustomize] = useState(false);
+
+  useEffect(() => {
+    if (!studentId) return;
+    const savedTwinName = window.localStorage.getItem(`neurotwin_twin_name_${studentId}`);
+    const savedTwinSeed = window.localStorage.getItem(`neurotwin_twin_seed_${studentId}`);
+    if (savedTwinName) {
+      setTwinName(savedTwinName);
+    }
+    if (savedTwinSeed) {
+      setTwinSeed(savedTwinSeed);
+    } else if (user?.displayName) {
+      setTwinSeed(user.displayName);
+    }
+  }, [studentId, user?.displayName]);
+
+  const handleTwinNameChange = (value: string) => {
+    setTwinName(value);
+    if (studentId) {
+      window.localStorage.setItem(`neurotwin_twin_name_${studentId}`, value);
+    }
+  };
+
+  const handleTwinSeedChange = (value: string) => {
+    setTwinSeed(value);
+    if (studentId) {
+      window.localStorage.setItem(`neurotwin_twin_seed_${studentId}`, value);
+    }
+  };
 
   const handleExportData = () => {
     if (!twin) return;
@@ -141,16 +177,63 @@ export default function ProfilePage() {
       <Card className="bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200 animate-fade-in-up">
         <CardContent className="py-8">
           <div className="flex items-center gap-6 mb-8">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center text-3xl text-white font-bold shadow-lg">
-              {twin.display_name[0]}
-            </div>
+            <img
+              src={getThumbUrl(twinSeed || twin.display_name)}
+              alt={twinName}
+              className="w-20 h-20 rounded-full border-2 border-white bg-white shadow-lg"
+            />
             <div>
-              <h2 className="text-2xl font-extrabold">{twin.display_name}&apos;s Twin</h2>
+              <h2 className="text-2xl font-extrabold">{twinName || "My Twin"}</h2>
               <p className="text-sm text-[var(--color-text-muted)]">
                 {twin.top_themes.length} themes · {twin.activity_preferences.length} activities
               </p>
             </div>
+            <div className="ml-auto">
+              <Button variant="outline" size="sm" onClick={() => setShowCustomize((v) => !v)}>
+                <Settings className="w-4 h-4" /> Rename & Avatar
+              </Button>
+            </div>
           </div>
+
+          {showCustomize && (
+            <div className="mb-6 p-4 bg-white/70 rounded-xl border border-[var(--color-border)] space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
+                  Twin Name
+                </label>
+                <input
+                  value={twinName}
+                  onChange={(e) => handleTwinNameChange(e.target.value)}
+                  placeholder="My Twin"
+                  className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
+                />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
+                  Thumb Avatar
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {twinAvatarOptions.map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => handleTwinSeedChange(option)}
+                      className={`p-1.5 rounded-full border transition-colors ${
+                        twinSeed === option
+                          ? "border-[var(--color-primary)] bg-[var(--color-primary-light)]"
+                          : "border-[var(--color-border)] bg-white"
+                      }`}
+                    >
+                      <img
+                        src={getThumbUrl(option)}
+                        alt={option}
+                        className="w-10 h-10 rounded-full"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white/80 rounded-xl p-4 text-center">

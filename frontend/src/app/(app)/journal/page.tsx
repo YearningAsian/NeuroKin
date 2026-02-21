@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Toast } from "@/components/ui/Toast";
-import { BookHeart, Send, Lock, Clock, Loader2 } from "lucide-react";
+import { BookHeart, Send, Lock, Clock, Loader2, Mic, MicOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { submitJournal, getJournalEntries, type JournalEntryPreview } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -32,6 +32,34 @@ const MOOD_EMOJI: Record<string, string> = {
   excited: "🤩",
 };
 
+type SpeechRecognitionResultItem = {
+  transcript: string;
+};
+
+type SpeechRecognitionEventLike = {
+  results: ArrayLike<ArrayLike<SpeechRecognitionResultItem>>;
+};
+
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
 export default function JournalPage() {
   const { user } = useAuth();
   const studentId = user?.studentId ?? "";
@@ -40,6 +68,11 @@ export default function JournalPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const speechSupported =
+    typeof window !== "undefined" &&
+    !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
   const fetcher = useCallback(
     () => getJournalEntries(studentId),
@@ -66,21 +99,50 @@ export default function JournalPage() {
     }
   };
 
+  const toggleListening = () => {
+    if (typeof window === "undefined") return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript?.trim();
+      if (transcript) {
+        setText((prev) => (prev.trim() ? `${prev}\n${transcript}` : transcript));
+      }
+    };
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    setIsListening(true);
+    recognition.start();
+  };
+
   return (
     <div className="space-y-8">
       <PageHeader
         icon={BookHeart}
         iconColor="text-[var(--color-warm)]"
         title="Journal"
-        description="Write freely. Your entries are encrypted and shape your Emotional Twin."
+        description="Write or speak freely. Your entries are encrypted and shape your Emotional Twin."
       />
 
       {/* Journal prompts */}
       <div className="animate-fade-in-up">
         <p className="text-sm font-medium text-[var(--color-text-muted)] mb-3">
-          Need a prompt? Try one of these:
+          Suggestions:
         </p>
-        <div className="flex flex-wrap gap-2">
+        <div className="overflow-x-auto pb-1">
+          <div className="inline-flex gap-2 min-w-max">
           {prompts.map((p) => (
             <button
               key={p}
@@ -98,6 +160,7 @@ export default function JournalPage() {
               {p}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
@@ -108,7 +171,7 @@ export default function JournalPage() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={8}
-            placeholder="Start writing... What's on your mind?"
+            placeholder="Start writing or speaking... What's on your mind?"
             className="w-full text-base leading-relaxed resize-none border-0 outline-none placeholder:text-slate-300 bg-transparent"
           />
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-[var(--color-border)]">
@@ -117,6 +180,16 @@ export default function JournalPage() {
               Encrypted & private
             </div>
             <div className="flex items-center gap-3">
+              {speechSupported && (
+                <Button
+                  onClick={toggleListening}
+                  variant={isListening ? "secondary" : "outline"}
+                  size="sm"
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  {isListening ? "Stop" : "Speak"}
+                </Button>
+              )}
               <span className="text-xs text-[var(--color-text-muted)]">
                 {text.length} characters
               </span>

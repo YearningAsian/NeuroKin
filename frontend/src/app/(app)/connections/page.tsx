@@ -23,14 +23,8 @@ import { getRecommendations, submitFeedback, reportUser, type PeerRecommendation
 import { useAuth } from "@/lib/auth";
 import { useFetch } from "@/hooks/useFetch";
 
-const avatarColors = [
-  "from-blue-400 to-indigo-500",
-  "from-emerald-400 to-teal-500",
-  "from-purple-400 to-pink-500",
-  "from-amber-400 to-orange-500",
-  "from-rose-400 to-red-500",
-  "from-cyan-400 to-blue-500",
-];
+const getThumbUrl = (seed: string) =>
+  `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(seed)}`;
 
 function scoreColor(score: number): string {
   if (score >= 80) return "bg-emerald-100 text-emerald-700 border-emerald-200";
@@ -47,12 +41,11 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
-function MatchCardInner({ match, colorIdx }: { match: PeerRecommendation; colorIdx: number }) {
+function MatchCardInner({ match }: { match: PeerRecommendation }) {
   const [expanded, setExpanded] = useState(false);
   const [accepted, setAccepted] = useState<boolean | null>(null);
   const { user } = useAuth();
   const studentId = user?.studentId ?? "";
-  const avatarColor = avatarColors[colorIdx % avatarColors.length];
   const score = Math.round(match.compatibility_score);
 
   const handleConnect = async () => {
@@ -73,14 +66,11 @@ function MatchCardInner({ match, colorIdx }: { match: PeerRecommendation; colorI
     <Card className={cn("card-hover transition-all", accepted && "border-emerald-200 bg-emerald-50/50")}>
       <CardContent className="py-5">
         <div className="flex items-center gap-4">
-          <div
-            className={cn(
-              "w-14 h-14 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-bold text-lg flex-shrink-0",
-              avatarColor
-            )}
-          >
-            {match.display_name[0]}
-          </div>
+          <img
+            src={getThumbUrl(match.display_name)}
+            alt={match.display_name}
+            className="w-14 h-14 rounded-full border border-[var(--color-border)] bg-white flex-shrink-0"
+          />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
               <h3 className="font-bold">{match.display_name}</h3>
@@ -243,8 +233,8 @@ export default function ConnectionsPage() {
           </h2>
         </div>
         <div className="space-y-3 stagger">
-          {matches.map((match, idx) => (
-            <MatchCard key={match.peer_id} match={match} colorIdx={idx} />
+          {matches.map((match) => (
+            <MatchCard key={match.peer_id} match={match} />
           ))}
         </div>
       </div>

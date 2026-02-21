@@ -29,6 +29,9 @@ const moodHistory = [
   { day: "Sun", label: "✨", value: 90 },
 ];
 
+const getThumbUrl = (seed: string) =>
+  `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(seed)}`;
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const studentId = user?.studentId ?? "";
@@ -49,42 +52,6 @@ export default function DashboardPage() {
         <p className="text-[var(--color-text-muted)] mt-1">
           Your Emotional Twin is active. Here&apos;s your overview.
         </p>
-      </div>
-
-      {/* Quick actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 stagger">
-        <Link href="/journal">
-          <Card className="card-hover cursor-pointer bg-amber-50 border-amber-200">
-            <CardContent className="flex flex-col items-center gap-2 py-6">
-              <BookHeart className="w-7 h-7 text-amber-600" />
-              <span className="text-sm font-semibold">Journal</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/mood">
-          <Card className="card-hover cursor-pointer bg-emerald-50 border-emerald-200">
-            <CardContent className="flex flex-col items-center gap-2 py-6">
-              <SmilePlus className="w-7 h-7 text-emerald-600" />
-              <span className="text-sm font-semibold">Mood Check-in</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/connections">
-          <Card className="card-hover cursor-pointer bg-blue-50 border-blue-200">
-            <CardContent className="flex flex-col items-center gap-2 py-6">
-              <Users className="w-7 h-7 text-blue-600" />
-              <span className="text-sm font-semibold">Connections</span>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link href="/profile">
-          <Card className="card-hover cursor-pointer bg-purple-50 border-purple-200">
-            <CardContent className="flex flex-col items-center gap-2 py-6">
-              <Brain className="w-7 h-7 text-purple-600" />
-              <span className="text-sm font-semibold">My Twin</span>
-            </CardContent>
-          </Card>
-        </Link>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -210,9 +177,11 @@ export default function DashboardPage() {
                 key={match.peer_id}
                 className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
               >
-                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-warm)] flex items-center justify-center text-white font-bold text-sm">
-                  {match.display_name[0]}
-                </div>
+                <img
+                  src={getThumbUrl(match.display_name)}
+                  alt={match.display_name}
+                  className="w-11 h-11 rounded-full border border-[var(--color-border)] bg-white"
+                />
                 <div className="flex-1">
                   <div className="font-semibold text-sm">{match.display_name}</div>
                   <div className="flex gap-1.5 mt-1">
