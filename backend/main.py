@@ -366,6 +366,16 @@ def _verify_password(password: str, stored_hash: str) -> bool:
     return _hash_password(password) == stored_hash
 
 
+def _ensure_auth_columns() -> None:
+    """Ensure auth-related columns exist for older deployments."""
+    if DEMO_MODE:
+        return
+    try:
+        _execute("ALTER TABLE students ADD COLUMN IF NOT EXISTS password_hash VARCHAR(128)")
+    except Exception as exc:
+        logger.warning("Auth schema auto-migration skipped: %s", exc)
+
+
 # ---------------------------------------------------------------------------
 # Snowflake Cortex Helpers (with demo-mode fallbacks)
 # ---------------------------------------------------------------------------
@@ -969,6 +979,8 @@ CREATE TABLE IF NOT EXISTS students (
     updated_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
+ALTER TABLE students ADD COLUMN IF NOT EXISTS password_hash VARCHAR(128);
+
 CREATE TABLE IF NOT EXISTS journal_entries (
     id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
     student_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
@@ -1570,10 +1582,21 @@ async def signup(payload: SignupPayload):
     Returns the student_id + display_name on success.
     """
     pw_hash = _hash_password(payload.password)
+    is_demo_repair = payload.student_id.startswith("demo-") and payload.password == "demo"
 
     if DEMO_MODE:
         if payload.student_id in _demo_store.get("students", {}):
-            raise HTTPException(409, "Account already exists.")
+            if not is_demo_repair:
+                raise HTTPException(409, "Account already exists.")
+            _demo_store["students"][payload.student_id].update({
+                "display_name": payload.display_name,
+                "password_hash": pw_hash,
+            })
+            return {
+                "status": "ok",
+                "student_id": payload.student_id,
+                "display_name": payload.display_name,
+            }
         _demo_store["students"][payload.student_id] = {
             "student_id": payload.student_id,
             "display_name": payload.display_name,
@@ -1582,6 +1605,7 @@ async def signup(payload: SignupPayload):
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
     else:
+        _ensure_auth_columns()
         # Check if already exists
         existing = _execute(
             "SELECT student_id FROM students WHERE student_id = %s",
@@ -1589,14 +1613,54 @@ async def signup(payload: SignupPayload):
             fetch=True,
         )
         if existing:
-            raise HTTPException(409, "Account already exists.")
-        _execute(
-            """
-            INSERT INTO students (student_id, display_name, email_hash, password_hash, onboarded)
-            VALUES (%s, %s, '', %s, FALSE)
-            """,
-            (payload.student_id, payload.display_name, pw_hash),
-        )
+            if not is_demo_repair:
+                raise HTTPException(409, "Account already exists.")
+            try:
+                _execute(
+                    """
+                    UPDATE students
+                    SET display_name = %s, password_hash = %s, updated_at = CURRENT_TIMESTAMP()
+                    WHERE student_id = %s
+                    """,
+                    (payload.display_name, pw_hash, payload.student_id),
+                )
+            except Exception as exc:
+                if "PASSWORD_HASH" in str(exc).upper() and "INVALID IDENTIFIER" in str(exc).upper():
+                    _execute(
+                        """
+                        UPDATE students
+                        SET display_name = %s, email_hash = %s, updated_at = CURRENT_TIMESTAMP()
+                        WHERE student_id = %s
+                        """,
+                        (payload.display_name, pw_hash, payload.student_id),
+                    )
+                else:
+                    raise
+            return {
+                "status": "ok",
+                "student_id": payload.student_id,
+                "display_name": payload.display_name,
+            }
+        try:
+            _execute(
+                """
+                INSERT INTO students (student_id, display_name, email_hash, password_hash, onboarded)
+                VALUES (%s, %s, '', %s, FALSE)
+                """,
+                (payload.student_id, payload.display_name, pw_hash),
+            )
+        except Exception as exc:
+            if "PASSWORD_HASH" in str(exc).upper() and "INVALID IDENTIFIER" in str(exc).upper():
+                _ensure_auth_columns()
+                _execute(
+                    """
+                    INSERT INTO students (student_id, display_name, email_hash, onboarded)
+                    VALUES (%s, %s, %s, FALSE)
+                    """,
+                    (payload.student_id, payload.display_name, pw_hash),
+                )
+            else:
+                raise
 
     return {
         "status": "ok",
@@ -1622,11 +1686,23 @@ async def login(payload: LoginPayload):
             "display_name": student.get("display_name", payload.student_id),
         }
     else:
-        rows = _execute(
-            "SELECT student_id, display_name, password_hash FROM students WHERE student_id = %s",
-            (payload.student_id,),
-            fetch=True,
-        )
+        _ensure_auth_columns()
+        try:
+            rows = _execute(
+                "SELECT student_id, display_name, password_hash FROM students WHERE student_id = %s",
+                (payload.student_id,),
+                fetch=True,
+            )
+        except Exception as exc:
+            if "PASSWORD_HASH" in str(exc).upper() and "INVALID IDENTIFIER" in str(exc).upper():
+                _ensure_auth_columns()
+                rows = _execute(
+                    "SELECT student_id, display_name, email_hash AS password_hash FROM students WHERE student_id = %s",
+                    (payload.student_id,),
+                    fetch=True,
+                )
+            else:
+                raise
         if not rows or rows[0].get("password_hash") != pw_hash:
             raise HTTPException(401, "Invalid credentials.")
         return {

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Brain, Loader2, LogIn, AlertCircle } from "lucide-react";
-import { login } from "@/lib/api";
+import { login, signup } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 const DEMO_ACCOUNTS = [
@@ -50,8 +50,35 @@ export default function LoginPage() {
     }
   };
 
-  const handleDemoLogin = (accountId: string) => {
-    handleLogin(accountId, "demo");
+  const handleDemoLogin = async (accountId: string) => {
+    const demo = DEMO_ACCOUNTS.find((a) => a.id === accountId);
+    if (!demo) {
+      handleLogin(accountId, "demo");
+      return;
+    }
+
+    setError("");
+    setSubmitting(true);
+    try {
+      await signup(accountId, demo.name, "demo");
+    } catch {
+      // Ignore signup errors here; login will provide final source of truth
+    }
+
+    try {
+      const result = await login(accountId, "demo");
+      authLogin(result.student_id, result.display_name);
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Login failed";
+      if (msg.includes("401")) {
+        setError("Demo account not ready yet. Please try again in a few seconds.");
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
