@@ -158,16 +158,16 @@ export default function JournalPage() {
         <p className="text-sm font-medium text-[var(--color-text-muted)] mb-3">
           Suggestions:
         </p>
-        <div ref={suggestionsRef} className="overflow-x-auto pb-1">
-          <div className="inline-flex gap-2 min-w-max">
-          {prompts.map((p) => (
-            <div
-              key={p}
-              className="text-sm px-4 py-2 rounded-full border border-[var(--color-border)] text-[var(--color-text-muted)] bg-white/70"
-            >
-              {p}
-            </div>
-          ))}
+        <div ref={suggestionsRef} className="overflow-x-auto scrollbar-none pb-1">
+          <div className="inline-flex gap-2">
+            {[...prompts, ...prompts].map((p, idx) => (
+              <div
+                key={`${p}-${idx}`}
+                className="flex-shrink-0 w-[48%] min-w-[200px] md:w-[48%] md:min-w-[220px] sm:w-[90%] bg-white border rounded-lg p-4 shadow text-sm text-[var(--color-text)]"
+              >
+                {p}
+              </div>
+            ))}
           </div>
         </div>
       </div>
