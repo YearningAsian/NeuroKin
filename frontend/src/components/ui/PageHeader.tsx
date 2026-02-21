@@ -15,7 +15,7 @@ export function PageHeader({
   title,
   description,
   className,
-}: PageHeaderProps) {
+}: Readonly<PageHeaderProps>) {
   return (
     <div className={cn("animate-fade-in-up", className)}>
       <h1 className="text-2xl md:text-3xl font-extrabold flex items-center gap-3">

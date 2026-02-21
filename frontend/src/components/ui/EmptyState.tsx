@@ -13,7 +13,7 @@ export function EmptyState({
   title,
   description,
   className,
-}: EmptyStateProps) {
+}: Readonly<EmptyStateProps>) {
   return (
     <div className={cn("text-center py-16", className)}>
       <Icon className="w-12 h-12 text-[var(--color-text-muted)] mx-auto mb-4" />

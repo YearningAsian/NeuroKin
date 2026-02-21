@@ -72,6 +72,9 @@ _demo_store: dict[str, dict] = {
     "safety_reports": [],
 }
 
+# SQL constants
+_SQL_TWIN_BY_STUDENT = "SELECT * FROM twin_snapshots WHERE student_id = %s"
+
 
 def _sf_connect():
     """Return a Snowflake connection using env-based credentials."""
@@ -272,7 +275,7 @@ def _demo_extract(text: str) -> dict:
     return {"emotions": emotions, "themes": themes[:5], "social_energy_hint": social_hint}
 
 
-def _demo_explain(me_themes: list, peer_themes: list, shared: list, score: float) -> dict:
+def _demo_explain(_me_themes: list, _peer_themes: list, shared: list, score: float) -> dict:
     """Simulate Cortex COMPLETE explanation generation for demo mode."""
     if shared:
         explanation = f"You both connect through themes like {', '.join(shared[:3])}. Your emotional patterns suggest you'd understand each other well."
@@ -562,7 +565,7 @@ class MatchRetrievalChain:
                 return []
         else:
             rows = _execute(
-                "SELECT * FROM twin_snapshots WHERE student_id = %s",
+                _SQL_TWIN_BY_STUDENT,
                 (student_id,),
                 fetch=True,
             )
@@ -579,7 +582,7 @@ class MatchRetrievalChain:
             ]
         else:
             candidates = _execute(
-                f"""
+                """
                 SELECT *,
                        VECTOR_COSINE_SIMILARITY(twin_embedding, PARSE_JSON(%s)::VECTOR(FLOAT, 768)) AS vec_sim
                 FROM twin_snapshots
@@ -911,7 +914,7 @@ async def post_journal(entry: JournalEntry):
             ),
         )
         rows = _execute(
-            "SELECT * FROM twin_snapshots WHERE student_id = %s",
+            _SQL_TWIN_BY_STUDENT,
             (entry.student_id,),
             fetch=True,
         )
@@ -951,7 +954,7 @@ async def post_mood(checkin: MoodCheckIn):
             ),
         )
         rows = _execute(
-            "SELECT * FROM twin_snapshots WHERE student_id = %s",
+            _SQL_TWIN_BY_STUDENT,
             (checkin.student_id,),
             fetch=True,
         )
@@ -976,7 +979,7 @@ async def get_twin(student_id: str = Query(...)):
         return twin
 
     rows = _execute(
-        "SELECT * FROM twin_snapshots WHERE student_id = %s",
+        _SQL_TWIN_BY_STUDENT,
         (student_id,),
         fetch=True,
     )

@@ -11,7 +11,7 @@ export function ProgressBar({
   label,
   value,
   gradient = "bg-gradient-to-r from-emerald-400 to-emerald-500",
-}: ProgressBarProps) {
+}: Readonly<ProgressBarProps>) {
   const pct = Math.round(value);
   return (
     <div>

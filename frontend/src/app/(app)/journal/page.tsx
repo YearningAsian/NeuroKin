@@ -143,8 +143,8 @@ export default function JournalPage() {
           Recent Entries
         </h2>
         <div className="space-y-3">
-          {pastEntries.map((entry, i) => (
-            <Card key={i} className="card-hover cursor-pointer">
+          {pastEntries.map((entry) => (
+            <Card key={entry.date} className="card-hover cursor-pointer">
               <CardContent className="flex items-start gap-4 py-4">
                 <div className="text-2xl mt-1">{entry.mood}</div>
                 <div className="flex-1 min-w-0">

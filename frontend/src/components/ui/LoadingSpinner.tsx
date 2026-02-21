@@ -10,7 +10,7 @@ interface LoadingSpinnerProps {
 export function LoadingSpinner({
   className,
   color = "text-[var(--color-primary)]",
-}: LoadingSpinnerProps) {
+}: Readonly<LoadingSpinnerProps>) {
   return (
     <div className={cn("flex items-center justify-center h-64", className)}>
       <Loader2 className={cn("w-8 h-8 animate-spin", color)} />

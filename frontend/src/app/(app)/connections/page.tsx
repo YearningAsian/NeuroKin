@@ -32,13 +32,14 @@ const avatarColors = [
   "from-cyan-400 to-blue-500",
 ];
 
+function scoreColor(score: number): string {
+  if (score >= 80) return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  if (score >= 65) return "bg-blue-100 text-blue-700 border-blue-200";
+  return "bg-amber-100 text-amber-700 border-amber-200";
+}
+
 function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 80
-      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-      : score >= 65
-        ? "bg-blue-100 text-blue-700 border-blue-200"
-        : "bg-amber-100 text-amber-700 border-amber-200";
+  const color = scoreColor(score);
   return (
     <div className={cn("px-3 py-1 rounded-full border text-sm font-bold", color)}>
       {score}%

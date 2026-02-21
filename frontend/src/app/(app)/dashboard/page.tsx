@@ -15,7 +15,7 @@ import {
   Sparkles,
   ArrowRight,
 } from "lucide-react";
-import { getTwin, getRecommendations, type TwinSnapshot, type PeerRecommendation } from "@/lib/api";
+import { getTwin, getRecommendations } from "@/lib/api";
 import { DEMO_STUDENT_ID } from "@/lib/user";
 import { useFetch } from "@/hooks/useFetch";
 

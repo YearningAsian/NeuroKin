@@ -6,7 +6,7 @@ interface UseFetchResult<T> {
   data: T | null;
   loading: boolean;
   error: Error | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 
 /**

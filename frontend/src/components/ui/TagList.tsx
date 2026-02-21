@@ -11,7 +11,7 @@ export function TagList({
   tags,
   tagClassName = "bg-[var(--color-primary-light)] text-amber-800",
   className,
-}: TagListProps) {
+}: Readonly<TagListProps>) {
   if (!tags.length) return null;
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>

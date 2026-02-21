@@ -17,7 +17,7 @@ export function Toast({
   visible,
   duration = 3000,
   onDismiss,
-}: ToastProps) {
+}: Readonly<ToastProps>) {
   const [show, setShow] = useState(visible);
 
   useEffect(() => {

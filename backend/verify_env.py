@@ -89,9 +89,9 @@ def main() -> int:
     except Exception as e:
         fail("Snowflake connection", str(e))
         print(
-            f"\n  Hint: double-check SNOWFLAKE_ACCOUNT — it should look like\n"
-            f"  'xy12345.us-east-2.aws' (the part before .snowflakecomputing.com).\n"
-            f"  Find it in Snowsight bottom-left → click account → copy icon."
+            "\n  Hint: double-check SNOWFLAKE_ACCOUNT — it should look like\n"
+            "  'xy12345.us-east-2.aws' (the part before .snowflakecomputing.com).\n"
+            "  Find it in Snowsight bottom-left → click account → copy icon."
         )
         return 1
 
@@ -100,7 +100,7 @@ def main() -> int:
     ok("Connected to Snowflake", f"v{version}")
 
     cur.execute("SELECT CURRENT_ACCOUNT(), CURRENT_ROLE(), CURRENT_WAREHOUSE(), CURRENT_DATABASE(), CURRENT_SCHEMA()")
-    acct, role, wh, db, schema = cur.fetchone()
+    _, role, wh, db, schema = cur.fetchone()
     ok("Session context", f"role={role}  wh={wh}  db={db}.{schema}")
 
     # 5. Check tables exist ----------------------------------------
@@ -123,8 +123,8 @@ def main() -> int:
         missing_tables = expected_tables - found
         fail("Missing tables", ", ".join(sorted(missing_tables)))
         print(
-            f"\n  Run the setup.sql script first:\n"
-            f"  Open backend/setup.sql in Snowsight → Run All\n"
+            "\n  Run the setup.sql script first:\n"
+            "  Open backend/setup.sql in Snowsight → Run All\n"
         )
 
     # 6. Cortex: SENTIMENT -----------------------------------------
@@ -181,7 +181,7 @@ def main() -> int:
         return 1
     else:
         print(f"  🎉  All checks passed! NeuroKin backend is fully wired to Snowflake.{RESET}")
-        print(f"     Start the server:  uvicorn main:app --reload\n")
+        print("     Start the server:  uvicorn main:app --reload\n")
         return 0
 
 
