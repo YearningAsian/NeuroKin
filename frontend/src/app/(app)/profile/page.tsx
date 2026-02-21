@@ -80,7 +80,7 @@ export default function ProfilePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white/80 rounded-xl p-4 text-center">
               <Activity className="w-6 h-6 text-emerald-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold">{Math.round(twin.mood_stability * 100)}%</div>
+              <div className="text-2xl font-bold">{Math.round(twin.mood_stability)}%</div>
               <div className="text-xs text-[var(--color-text-muted)]">Mood Stability</div>
             </div>
             <div className="bg-white/80 rounded-xl p-4 text-center">

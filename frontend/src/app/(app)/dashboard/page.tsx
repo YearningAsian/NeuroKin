@@ -30,18 +30,12 @@ const moodHistory = [
 ];
 
 export default function DashboardPage() {
-  const { data, loading } = useFetch(async () => {
-    const [t, r] = await Promise.all([
-      getTwin(DEMO_STUDENT_ID),
-      getRecommendations(DEMO_STUDENT_ID),
-    ]);
-    return { twin: t, matches: r.slice(0, 3) };
-  });
+  const { data: twin, loading: twinLoading } = useFetch(() => getTwin(DEMO_STUDENT_ID));
+  const { data: recommendations, loading: recommendationsLoading } = useFetch(() => getRecommendations(DEMO_STUDENT_ID));
 
-  const twin = data?.twin ?? null;
-  const recentMatches = data?.matches ?? [];
+  const recentMatches = (recommendations ?? []).slice(0, 3);
 
-  if (loading) return <LoadingSpinner />;
+  if (twinLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-8">
@@ -105,7 +99,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 gap-6">
               <ProgressBar
                 label="Mood Stability"
-                value={(twin?.mood_stability ?? 0) * 100}
+                value={twin?.mood_stability ?? 0}
                 gradient="bg-gradient-to-r from-emerald-400 to-emerald-500"
               />
               <ProgressBar
@@ -188,8 +182,13 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {recentMatches.map((match) => (
+          {recommendationsLoading ? (
+            <div className="py-6 flex justify-center">
+              <LoadingSpinner color="text-[var(--color-primary)]" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentMatches.map((match) => (
               <div
                 key={match.peer_id}
                 className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
@@ -217,8 +216,12 @@ export default function DashboardPage() {
                   <div className="text-xs text-[var(--color-text-muted)]">compatible</div>
                 </div>
               </div>
-            ))}
-          </div>
+              ))}
+              {recentMatches.length === 0 && (
+                <div className="text-sm text-[var(--color-text-muted)] py-2">No matches yet.</div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

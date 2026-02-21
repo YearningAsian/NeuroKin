@@ -23,6 +23,8 @@ import math
 import random
 import hashlib
 import logging
+from queue import Empty, LifoQueue
+from threading import Lock
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
@@ -39,8 +41,10 @@ from pydantic import BaseModel, Field
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("neurokin")
+logging.getLogger("snowflake.connector").setLevel(logging.WARNING)
 
 DEMO_MODE = os.environ.get("DEMO_MODE", "1") == "1"
+ENABLE_CORTEX_EXPLANATIONS = os.environ.get("ENABLE_CORTEX_EXPLANATIONS", "0") == "1"
 
 if not DEMO_MODE:
     import snowflake.connector  # only import when actually needed
@@ -74,6 +78,10 @@ _demo_store: dict[str, dict] = {
 
 # SQL constants
 _SQL_TWIN_BY_STUDENT = "SELECT * FROM twin_snapshots WHERE student_id = %s"
+_SNOWFLAKE_POOL_SIZE = max(1, int(os.environ.get("SNOWFLAKE_POOL_SIZE", "4")))
+_snowflake_pool: LifoQueue = LifoQueue(maxsize=_SNOWFLAKE_POOL_SIZE)
+_snowflake_pool_lock = Lock()
+_snowflake_conn_count = 0
 
 
 def _sf_connect():
@@ -86,14 +94,59 @@ def _sf_connect():
         schema=os.environ.get("SNOWFLAKE_SCHEMA", "PUBLIC"),
         warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "NEUROKIN_WH"),
         role=os.environ.get("SNOWFLAKE_ROLE", "NEUROKIN_APP_ROLE"),
+        client_session_keep_alive=True,
     )
+
+
+def _dispose_sf_conn(conn) -> None:
+    global _snowflake_conn_count
+    try:
+        conn.close()
+    finally:
+        with _snowflake_pool_lock:
+            _snowflake_conn_count = max(0, _snowflake_conn_count - 1)
+
+
+def _acquire_sf_conn():
+    global _snowflake_conn_count
+
+    try:
+        conn = _snowflake_pool.get_nowait()
+    except Empty:
+        with _snowflake_pool_lock:
+            can_create = _snowflake_conn_count < _SNOWFLAKE_POOL_SIZE
+            if can_create:
+                _snowflake_conn_count += 1
+        if can_create:
+            return _sf_connect()
+        conn = _snowflake_pool.get()
+
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        cur.close()
+        return conn
+    except Exception:
+        _dispose_sf_conn(conn)
+        with _snowflake_pool_lock:
+            _snowflake_conn_count += 1
+        return _sf_connect()
+
+
+def _release_sf_conn(conn) -> None:
+    try:
+        _snowflake_pool.put_nowait(conn)
+    except Exception:
+        _dispose_sf_conn(conn)
 
 
 def _execute(sql: str, params: tuple = (), *, fetch: bool = False):
     """Execute a query against Snowflake (skipped in DEMO_MODE)."""
     if DEMO_MODE:
         return [] if fetch else 0
-    conn = _sf_connect()
+    conn = _acquire_sf_conn()
+    conn_broken = False
+    cur = None
     try:
         cur = conn.cursor()
         cur.execute(sql, params)
@@ -101,8 +154,33 @@ def _execute(sql: str, params: tuple = (), *, fetch: bool = False):
             cols = [d[0].lower() for d in cur.description]
             return [dict(zip(cols, row)) for row in cur.fetchall()]
         return cur.rowcount
+    except Exception:
+        conn_broken = True
+        raise
     finally:
-        conn.close()
+        if cur is not None:
+            cur.close()
+        if conn_broken:
+            _dispose_sf_conn(conn)
+        else:
+            _release_sf_conn(conn)
+
+
+def _ensure_student_exists(student_id: str, display_name: str = "") -> None:
+    """Create a minimal students row when missing (idempotent)."""
+    if DEMO_MODE:
+        return
+    resolved_name = display_name or student_id
+    _execute(
+        """
+        MERGE INTO students AS tgt
+        USING (SELECT %s AS student_id, %s AS display_name) AS src
+        ON tgt.student_id = src.student_id
+        WHEN NOT MATCHED THEN INSERT (student_id, display_name)
+        VALUES (src.student_id, src.display_name)
+        """,
+        (student_id, resolved_name),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -352,6 +430,17 @@ def _clamp01(v: float) -> float:
     return max(0.0, min(1.0, v))
 
 
+def _clamp100(v: float) -> float:
+    return max(0.0, min(100.0, v))
+
+
+def _normalize_percentage(v: float) -> float:
+    """Normalize legacy 0-1 values and 0-100 values into 0-100."""
+    if v <= 1.0:
+        return _clamp100(v * 100.0)
+    return _clamp100(v)
+
+
 def _cosine_sim(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     norm_a = sum(x * x for x in a) ** 0.5
@@ -496,36 +585,48 @@ Journal entry:
             _execute(
                 """
                 MERGE INTO twin_snapshots AS tgt
-                USING (SELECT %s AS student_id) AS src
+                USING (
+                    SELECT
+                        %s AS student_id,
+                        PARSE_JSON(%s) AS twin_embedding,
+                        PARSE_JSON(%s) AS emotion_distribution,
+                        PARSE_JSON(%s) AS top_themes,
+                        PARSE_JSON(%s) AS activity_preferences,
+                        %s AS mood_stability,
+                        %s AS social_energy,
+                        PARSE_JSON(%s) AS shared_values_tags,
+                        %s AS schedule_overlap,
+                        %s AS last_updated
+                ) AS src
                 ON tgt.student_id = src.student_id
                 WHEN MATCHED THEN UPDATE SET
-                    twin_embedding   = PARSE_JSON(%s),
-                    emotion_distribution = PARSE_JSON(%s),
-                    top_themes       = PARSE_JSON(%s),
-                    activity_preferences = PARSE_JSON(%s),
-                    mood_stability   = %s,
-                    social_energy    = %s,
-                    shared_values_tags = PARSE_JSON(%s),
-                    schedule_overlap = %s,
-                    last_updated     = %s
+                    twin_embedding   = src.twin_embedding,
+                    emotion_distribution = src.emotion_distribution,
+                    top_themes       = src.top_themes,
+                    activity_preferences = src.activity_preferences,
+                    mood_stability   = src.mood_stability,
+                    social_energy    = src.social_energy,
+                    shared_values_tags = src.shared_values_tags,
+                    schedule_overlap = src.schedule_overlap,
+                    last_updated     = src.last_updated
                 WHEN NOT MATCHED THEN INSERT (
                     student_id, twin_embedding, emotion_distribution, top_themes,
                     activity_preferences, mood_stability, social_energy,
                     shared_values_tags, schedule_overlap, last_updated
-                ) VALUES (%s, PARSE_JSON(%s), PARSE_JSON(%s), PARSE_JSON(%s),
-                          PARSE_JSON(%s), %s, %s, PARSE_JSON(%s), %s, %s)
+                ) VALUES (
+                    src.student_id,
+                    src.twin_embedding,
+                    src.emotion_distribution,
+                    src.top_themes,
+                    src.activity_preferences,
+                    src.mood_stability,
+                    src.social_energy,
+                    src.shared_values_tags,
+                    src.schedule_overlap,
+                    src.last_updated
+                )
                 """,
                 (
-                    twin.student_id,
-                    json.dumps(twin.twin_embedding),
-                    json.dumps(twin.emotion_distribution),
-                    json.dumps(twin.top_themes),
-                    json.dumps(twin.activity_preferences),
-                    twin.mood_stability,
-                    twin.social_energy,
-                    json.dumps(twin.shared_values_tags),
-                    twin.schedule_overlap,
-                    twin.last_updated.isoformat(),
                     twin.student_id,
                     json.dumps(twin.twin_embedding),
                     json.dumps(twin.emotion_distribution),
@@ -584,9 +685,10 @@ class MatchRetrievalChain:
             candidates = _execute(
                 """
                 SELECT *,
-                       VECTOR_COSINE_SIMILARITY(twin_embedding, PARSE_JSON(%s)::VECTOR(FLOAT, 768)) AS vec_sim
+                      VECTOR_COSINE_SIMILARITY(twin_embedding::VECTOR(FLOAT, 768), PARSE_JSON(%s)::VECTOR(FLOAT, 768)) AS vec_sim
                 FROM twin_snapshots
-                WHERE student_id != %s
+                  WHERE student_id != %s
+                    AND twin_embedding IS NOT NULL
                 ORDER BY vec_sim DESC
                 LIMIT %s
                 """,
@@ -665,6 +767,16 @@ Rules:
 
 
 def _generate_explanation(me: TwinSnapshot, peer: TwinSnapshot, score: float, shared: list[str]) -> tuple[str, str]:
+    if not ENABLE_CORTEX_EXPLANATIONS:
+        if shared:
+            return (
+                f"You both connect through {', '.join(shared[:3])}, with complementary emotional patterns.",
+                "What part of your week has felt most meaningful lately?",
+            )
+        return (
+            f"Your profiles complement each other with a {score}% compatibility score.",
+            "What’s one thing you’re currently excited to learn or try?",
+        )
     return ExplanationChain.run(me, peer, score, shared)
 
 
@@ -685,18 +797,26 @@ def _row_to_twin(row: dict) -> TwinSnapshot:
                 return default
         return val
 
+    def _to_float(val, default: float = 0.0) -> float:
+        if val is None:
+            return default
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return default
+
     return TwinSnapshot(
         student_id=row.get("student_id", ""),
-        display_name=row.get("display_name", ""),
+        display_name=row.get("display_name") or "",
         twin_embedding=_parse_json_field(row.get("twin_embedding"), []),
         emotion_distribution=_parse_json_field(row.get("emotion_distribution"), {}),
         top_themes=_parse_json_field(row.get("top_themes"), []),
         activity_preferences=_parse_json_field(row.get("activity_preferences"), []),
-        mood_stability=float(row.get("mood_stability", 0)),
-        social_energy=float(row.get("social_energy", 0)),
+        mood_stability=_normalize_percentage(_to_float(row.get("mood_stability"), 0.0)),
+        social_energy=_to_float(row.get("social_energy"), 0.0),
         shared_values_tags=_parse_json_field(row.get("shared_values_tags"), []),
-        schedule_overlap=float(row.get("schedule_overlap", 0)),
-        last_updated=row.get("last_updated", datetime.now(timezone.utc)),
+        schedule_overlap=_to_float(row.get("schedule_overlap"), 0.0),
+        last_updated=row.get("last_updated") or datetime.now(timezone.utc),
     )
 
 
@@ -780,7 +900,7 @@ def _seed_demo_data():
             "activities": ["coding", "guitar", "trail running", "reading"],
             "values": ["creativity", "growth", "authenticity"],
             "energy": 72,
-            "mood_stability": 0.78,
+            "mood_stability": 78,
             "schedule": 0.6,
         },
         {
@@ -791,7 +911,7 @@ def _seed_demo_data():
             "activities": ["journaling", "yoga", "volunteering", "reading"],
             "values": ["empathy", "sustainability", "authenticity"],
             "energy": 55,
-            "mood_stability": 0.85,
+            "mood_stability": 85,
             "schedule": 0.5,
         },
         {
@@ -802,7 +922,7 @@ def _seed_demo_data():
             "activities": ["basketball", "cooking", "guitar", "coding"],
             "values": ["ambition", "teamwork", "growth"],
             "energy": 85,
-            "mood_stability": 0.65,
+            "mood_stability": 65,
             "schedule": 0.7,
         },
         {
@@ -813,7 +933,7 @@ def _seed_demo_data():
             "activities": ["stargazing", "painting", "reading", "trail running"],
             "values": ["knowledge", "patience", "creativity"],
             "energy": 45,
-            "mood_stability": 0.90,
+            "mood_stability": 90,
             "schedule": 0.4,
         },
         {
@@ -824,7 +944,7 @@ def _seed_demo_data():
             "activities": ["coding", "gaming", "guitar", "reading"],
             "values": ["innovation", "creativity", "growth"],
             "energy": 68,
-            "mood_stability": 0.70,
+            "mood_stability": 70,
             "schedule": 0.8,
         },
         {
@@ -835,7 +955,7 @@ def _seed_demo_data():
             "activities": ["dance", "volunteering", "journaling", "yoga"],
             "values": ["justice", "community", "empathy"],
             "energy": 62,
-            "mood_stability": 0.75,
+            "mood_stability": 75,
             "schedule": 0.5,
         },
     ]
@@ -872,9 +992,27 @@ async def _bootstrap():
     try:
         for stmt in [s.strip() for s in BOOTSTRAP_SQL.split(";") if s.strip()]:
             _execute(stmt)
-        logger.info("Snowflake tables bootstrapped.")
+        logger.info("Snowflake tables bootstrapped. pool_size=%d", _SNOWFLAKE_POOL_SIZE)
     except Exception as exc:
         logger.warning("Snowflake bootstrap skipped (check credentials): %s", exc)
+
+
+@app.on_event("shutdown")
+async def _shutdown():
+    if DEMO_MODE:
+        return
+    closed = 0
+    while True:
+        try:
+            conn = _snowflake_pool.get_nowait()
+        except Empty:
+            break
+        try:
+            conn.close()
+            closed += 1
+        except Exception:
+            pass
+    logger.info("Snowflake pool closed connections=%d", closed)
 
 
 # ---------------------------------------------------------------------------
@@ -900,10 +1038,11 @@ async def post_journal(entry: JournalEntry):
         })
         existing = _demo_store["twin_snapshots"].get(entry.student_id)
     else:
+        _ensure_student_exists(entry.student_id)
         _execute(
             """
             INSERT INTO journal_entries (student_id, text_encrypted, mood_label, tags, embedding)
-            VALUES (%s, %s, %s, PARSE_JSON(%s), PARSE_JSON(%s))
+            SELECT %s, %s, %s, PARSE_JSON(%s), PARSE_JSON(%s)
             """,
             (
                 entry.student_id,
@@ -939,6 +1078,7 @@ async def post_mood(checkin: MoodCheckIn):
         })
         existing = _demo_store["twin_snapshots"].get(checkin.student_id)
     else:
+        _ensure_student_exists(checkin.student_id)
         _execute(
             """
             INSERT INTO mood_checkins (student_id, mood_label, energy_level, stress_level, social_battery, notes)
