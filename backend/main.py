@@ -79,10 +79,10 @@ def _sf_connect():
         account=os.environ["SNOWFLAKE_ACCOUNT"],
         user=os.environ["SNOWFLAKE_USER"],
         password=os.environ["SNOWFLAKE_PASSWORD"],
-        database=os.environ.get("SNOWFLAKE_DATABASE", "NEUROKIN"),
+        database=os.environ.get("SNOWFLAKE_DATABASE", "NEUROKIN_DB"),
         schema=os.environ.get("SNOWFLAKE_SCHEMA", "PUBLIC"),
         warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "NEUROKIN_WH"),
-        role=os.environ.get("SNOWFLAKE_ROLE", "NEUROKIN_ROLE"),
+        role=os.environ.get("SNOWFLAKE_ROLE", "NEUROKIN_APP_ROLE"),
     )
 
 
