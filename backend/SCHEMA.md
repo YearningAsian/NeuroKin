@@ -1,6 +1,6 @@
-# NeuroKin Database Schema
+# NeuroTwin Database Schema
 
-> Snowflake · `NEUROKIN_DB.PUBLIC`
+> Snowflake · `NEUROTWIN_DB.PUBLIC`
 >
 > Last updated: 2026-02-21
 

@@ -109,7 +109,7 @@ export default function LoginPage() {
             </div>
             <h1 className="text-2xl font-extrabold">Welcome back</h1>
             <p className="text-sm text-[var(--color-text-muted)] mt-1">
-              Log in to your NeuroKin account
+              Log in to your NeuroTwin account
             </p>
           </div>
 

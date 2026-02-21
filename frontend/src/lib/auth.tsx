@@ -21,7 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
 });
 
-const STORAGE_KEY = "neurokin_session";
+const STORAGE_KEY = "neurotwin_session";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);

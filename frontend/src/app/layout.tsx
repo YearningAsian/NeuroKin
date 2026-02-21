@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "NeuroKin — Find Your People",
+  title: "NeuroTwin — Find Your People",
   description:
     "An emotionally intelligent platform that helps students find meaningful peer connections through Digital Twin technology.",
 };

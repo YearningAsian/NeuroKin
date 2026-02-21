@@ -1,8 +1,8 @@
-# NeuroKin
+# NeuroTwin
 
 **Emotionally Intelligent Digital Twin System for Student Connection**
 
-NeuroKin builds an Emotional Digital Twin for each student using journaling, mood signals, and activity patterns. It computes an Emotional Compatibility Score between students and recommends meaningful peer connections above a 50% threshold.
+NeuroTwin builds an Emotional Digital Twin for each student using journaling, mood signals, and activity patterns. It computes an Emotional Compatibility Score between students and recommends meaningful peer connections above a 50% threshold.
 
 ---
 
@@ -22,7 +22,7 @@ NeuroKin builds an Emotional Digital Twin for each student using journaling, moo
 ## Project Structure
 
 ```
-NeuroKin/
+NeuroTwin/
 ├── frontend/                 # Next.js App Router
 │   ├── src/
 │   │   ├── app/

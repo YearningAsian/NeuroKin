@@ -9,7 +9,6 @@ import {
   Sparkles,
   Users,
   ArrowRight,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   BookOpen,
@@ -57,6 +56,8 @@ const twinFactors: TwinFactor[] = [
     icon: Heart,
     color: "#f43f5e",
     angle: -90,
+    bubbleShift: { x: -90, y: -30 },
+        tailShift: { dx: 80 },
   },
   {
     label: "Journal Reflections",
@@ -64,6 +65,8 @@ const twinFactors: TwinFactor[] = [
     icon: BookOpen,
     color: "#f59e0b",
     angle: -18,
+    bubbleShift: { x: -20, y: -40 },
+    tailShift: { dx: -10 },
   },
   {
     label: "Daily Activities",
@@ -71,6 +74,8 @@ const twinFactors: TwinFactor[] = [
     icon: Activity,
     color: "#3b82f6",
     angle: 54,
+    bubbleShift: { x: -70, y: 10 },
+    tailShift: { dx: -10 },
   },
   {
     label: "Core Values",
@@ -78,6 +83,8 @@ const twinFactors: TwinFactor[] = [
     icon: Star,
     color: "#8b5cf6",
     angle: 126,
+    bubbleShift: { x: -130, y: -10 },
+    tailShift: { dx: -10 },
   },
   {
     label: "Social Energy",
@@ -85,8 +92,8 @@ const twinFactors: TwinFactor[] = [
     icon: Users,
     color: "#10b981",
     angle: 198,
-    bubbleShift: { x: -35 },
-    tailShift: { dx: 12 },
+    bubbleShift: { x: -200, y: -20 },
+    tailShift: { dx: -10 },
   },
 ];
 
@@ -492,7 +499,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white overflow-x-hidden">
+    <main className="min-h-screen bg-white">
       {/* ──── HEADER ──── */}
       <motion.header
         className="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-xl border-b border-slate-100/60"
@@ -678,24 +685,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Scroll indicator ── */}
-      <motion.div
-        className="flex justify-center pb-10"
-        animate={{ y: [0, 8, 0] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      >
-        <div className="w-6 h-10 rounded-full border-2 border-slate-300 flex justify-center pt-2">
-          <motion.div
-            className="w-1.5 h-1.5 rounded-full bg-slate-400"
-            animate={{ y: [0, 12, 0] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          />
-        </div>
-      </motion.div>
-
+      <div className="relative w-full">
       {/* ═══════════════ FEATURES ═══════════════ */}
-      <section id="features" className="py-20 md:py-32 bg-slate-50/50">
-        <div className="max-w-6xl mx-auto px-4">
+      <section
+        id="features"
+        className="relative bg-slate-50/50 py-20 md:py-0 md:h-screen md:sticky md:top-0 md:z-10 md:flex md:items-center md:shadow-xl"
+      >
+        <div className="max-w-6xl mx-auto px-4 w-full pb-5 md:pt-15 md:pb-13">
           <FadeInWhenVisible>
             <div className="text-center mb-16">
               <span className="text-sm font-semibold text-[var(--color-primary)] uppercase tracking-wider">
@@ -746,8 +742,11 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════ HOW IT WORKS ═══════════════ */}
-      <section id="how-it-works" className="py-20 md:py-32">
-        <div className="max-w-5xl mx-auto px-4">
+      <section
+        id="how-it-works"
+        className="relative z-20 bg-white py-20 md:py-0 md:h-screen md:sticky md:top-0 md:flex md:items-center md:shadow-xl"
+      >
+        <div className="max-w-5xl mx-auto px-4 md:pt-20">
           <FadeInWhenVisible>
             <div className="text-center mb-16">
               <span className="text-sm font-semibold text-blue-500 uppercase tracking-wider">
@@ -807,8 +806,8 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════ MATCHING PREVIEW ═══════════════ */}
-      <section className="py-20 md:py-32 bg-gradient-to-b from-white to-slate-50">
-        <div className="max-w-6xl mx-auto px-4">
+      <section className="relative z-30 bg-gradient-to-b from-white to-slate-50 py-20 md:py-0 md:h-screen md:sticky md:top-0 md:flex md:items-center md:shadow-none">
+        <div className="max-w-6xl mx-auto px-4 md:pt-20">
           <FadeInWhenVisible>
             <div className="text-center mb-16">
               <span className="text-sm font-semibold text-rose-500 uppercase tracking-wider">
@@ -851,10 +850,9 @@ export default function LandingPage() {
             ].map((match, i) => (
               <FadeInWhenVisible key={match.name} delay={i * 0.12}>
                 <motion.div
-                  className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm"
+                  className="bg-white rounded-3xl border border-slate-100 p-6"
                   whileHover={{
                     y: -8,
-                    boxShadow: "0 20px 60px rgba(0,0,0,0.1)",
                   }}
                 >
                   <div className="flex items-center gap-4 mb-4">
@@ -901,9 +899,13 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+      </div>
 
       {/* ═══════════════ TESTIMONIALS CAROUSEL ═══════════════ */}
-      <section id="testimonials" className="py-20 md:py-32">
+      <section
+        id="testimonials"
+        className="relative z-40 bg-white py-20 md:py-32"
+      >
         <div className="max-w-6xl mx-auto px-4">
           <FadeInWhenVisible>
             <div className="text-center mb-14">
@@ -921,43 +923,6 @@ export default function LandingPage() {
 
           <FadeInWhenVisible delay={0.2}>
             <Carousel />
-          </FadeInWhenVisible>
-        </div>
-      </section>
-
-      {/* ═══════════════ SAFETY ═══════════════ */}
-      <section className="py-20 md:py-28 bg-slate-50">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <FadeInWhenVisible>
-            <motion.div
-              className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-100 mb-6"
-              whileHover={{ rotate: 10 }}
-            >
-              <Shield className="w-8 h-8 text-emerald-600" />
-            </motion.div>
-            <h2 className="text-3xl md:text-4xl font-extrabold mb-4">
-              Designed with safety at the core
-            </h2>
-            <p className="text-slate-500 max-w-2xl mx-auto mb-10 text-lg leading-relaxed">
-              NeuroTwin is built with FERPA & COPPA compliance in mind. Your raw
-              journals are encrypted and never shared.
-            </p>
-            <div className="flex flex-wrap justify-center gap-3">
-              {[
-                "Encrypted journals",
-                "No raw data shared",
-                "Opt-out anytime",
-                "Block & report",
-                "FERPA ready",
-              ].map((item, i) => (
-                <FadeInWhenVisible key={item} delay={i * 0.08}>
-                  <span className="flex items-center gap-2 text-sm px-5 py-2.5 rounded-full bg-white border border-slate-200 font-medium shadow-sm">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    {item}
-                  </span>
-                </FadeInWhenVisible>
-              ))}
-            </div>
           </FadeInWhenVisible>
         </div>
       </section>
@@ -1016,6 +981,6 @@ export default function LandingPage() {
           </p>
         </div>
       </footer>
-    </div>
+    </main>
   );
 }

@@ -90,7 +90,7 @@ export default function OnboardingPage() {
       <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-warm)] flex items-center justify-center">
         <Brain className="w-10 h-10 text-white" />
       </div>
-      <h1 className="text-3xl font-extrabold mb-3">Welcome to NeuroKin</h1>
+      <h1 className="text-3xl font-extrabold mb-3">Welcome to NeuroTwin</h1>
       <p className="text-[var(--color-text-muted)] max-w-md mx-auto mb-8 leading-relaxed">
         Let&apos;s build your Emotional Digital Twin. This helps us find peers who
         truly resonate with you. It takes about 2 minutes.

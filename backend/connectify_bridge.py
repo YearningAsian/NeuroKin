@@ -1,14 +1,14 @@
 """
 Connectify Bridge — Integration Layer
 ======================================
-This module bridges NeuroKin with the original *Connectify* prototype
+This module bridges NeuroTwin with the original *Connectify* prototype
 (https://github.com/vinodhini-rajasekhar/Connectify-building-connections-at-school).
 
 Connectify is the predecessor system described in the project spec §7.5
-("Evolution from Connectify").  NeuroKin advances Connectify in several ways:
+("Evolution from Connectify").  NeuroTwin advances Connectify in several ways:
 
   ┌───────────────────┬───────────────────┬───────────────────────────────────┐
-  │  Dimension        │  Connectify       │  NeuroKin (evolution)             │
+    │  Dimension        │  Connectify       │  NeuroTwin (evolution)             │
   ├───────────────────┼───────────────────┼───────────────────────────────────┤
   │  Matching         │  Single cosine    │  Weighted 5-factor model          │
   │                   │  similarity on    │  (embedding 50% + emotion 20% +   │
@@ -34,7 +34,7 @@ Connectify is the predecessor system described in the project spec §7.5
 
 HOW TO USE THIS MODULE
 ----------------------
-This module allows NeuroKin to *optionally* query a running Connectify backend
+This module allows NeuroTwin to *optionally* query a running Connectify backend
 to demonstrate side-by-side comparison matching (spec §7.5 narrative).
 
 Step 1 — Clone and run Connectify:
@@ -49,7 +49,7 @@ Step 2 — Set the CONNECTIFY_API_URL environment variable:
 
     export CONNECTIFY_API_URL=http://localhost:9000
 
-Step 3 — Import and use in NeuroKin:
+Step 3 — Import and use in NeuroTwin:
 
     from connectify_bridge import ConnectifyBridge
 
@@ -63,8 +63,8 @@ Step 3 — Import and use in NeuroKin:
         )
         print(matches)  # Connectify-style cosine-similarity matches
 
-        # Compare with NeuroKin's weighted multi-factor match
-        neurokin_recs = MatchRetrievalChain.run("demo-alex")
+        # Compare with NeuroTwin's weighted multi-factor match
+        neurotwin_recs = MatchRetrievalChain.run("demo-alex")
         # ... show side-by-side for §7.5 presentation
 
 Step 4 — Optional: Register the bridge endpoint in main.py
@@ -77,7 +77,7 @@ Step 4 — Optional: Register the bridge endpoint in main.py
     This exposes:
         GET  /connectify/health        — check if Connectify backend is reachable
         POST /connectify/match         — submit query + get Connectify matches
-        POST /connectify/compare       — side-by-side NeuroKin vs Connectify
+        POST /connectify/compare       — side-by-side NeuroTwin vs Connectify
 """
 
 from __future__ import annotations
@@ -95,7 +95,7 @@ try:
 except ImportError:
     _HAS_FASTAPI = False
 
-logger = logging.getLogger("neurokin.connectify_bridge")
+logger = logging.getLogger("neurotwin.connectify_bridge")
 
 CONNECTIFY_API_URL = os.environ.get("CONNECTIFY_API_URL", "").rstrip("/")
 CONNECTIFY_TIMEOUT = int(os.environ.get("CONNECTIFY_TIMEOUT", "10"))
@@ -136,7 +136,7 @@ class ConnectifyQueryRequest(BaseModel):
 class ConnectifyBridge:
     """
     Thin HTTP client that forwards requests to a running Connectify backend.
-    Completely optional — NeuroKin runs fine without it.
+    Completely optional — NeuroTwin runs fine without it.
     """
 
     def __init__(self, base_url: str = ""):
@@ -275,7 +275,7 @@ if _HAS_FASTAPI:
     @router.post("/compare")
     async def connectify_compare(req: ConnectifyQueryRequest):
         """
-        Side-by-side comparison: Connectify single-cosine vs NeuroKin multi-factor.
+        Side-by-side comparison: Connectify single-cosine vs NeuroTwin multi-factor.
         Useful for §7.5 "Evolution from Connectify" demonstration.
         """
         bridge = ConnectifyBridge()
@@ -295,15 +295,15 @@ if _HAS_FASTAPI:
                 "approach": "Single cosine similarity on 1536-d OpenAI embeddings",
                 "matches": [m.model_dump() for m in connectify_result.matches[:5]],
             },
-            "neurokin": {
+            "neurotwin": {
                 "approach": "Weighted 5-factor: embedding 50% + emotion 20% + activity 15% + values 10% + schedule 5%",
-                "note": "Call GET /recommendations?student_id=... for NeuroKin results",
+                "note": "Call GET /recommendations?student_id=... for NeuroTwin results",
             },
             "evolution_notes": [
-                "NeuroKin uses persistent Emotional Digital Twins vs volatile per-query embeddings",
-                "NeuroKin uses Snowflake Cortex (no external API keys) vs OpenAI API",
-                "NeuroKin adds emotional resonance, activity overlap, and shared values to matching",
-                "NeuroKin encrypts journal text at rest (Fernet) and never shares raw content",
-                "NeuroKin uses LangChain RunnableLambda chains for composable ML pipelines",
+                "NeuroTwin uses persistent Emotional Digital Twins vs volatile per-query embeddings",
+                "NeuroTwin uses Snowflake Cortex (no external API keys) vs OpenAI API",
+                "NeuroTwin adds emotional resonance, activity overlap, and shared values to matching",
+                "NeuroTwin encrypts journal text at rest (Fernet) and never shares raw content",
+                "NeuroTwin uses LangChain RunnableLambda chains for composable ML pipelines",
             ],
         }

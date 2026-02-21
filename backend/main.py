@@ -1,5 +1,5 @@
 """
-NeuroKin Backend
+NeuroTwin Backend
 ================
 Emotionally Intelligent Digital Twin System for Student Connection.
 
@@ -56,7 +56,7 @@ except ImportError:
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("neurokin")
+logger = logging.getLogger("neurotwin")
 logging.getLogger("snowflake.connector").setLevel(logging.WARNING)
 
 DEMO_MODE = os.environ.get("DEMO_MODE", "1") == "1"
@@ -87,7 +87,7 @@ if not DEMO_MODE:
     import snowflake.connector  # only import when actually needed
 
 app = FastAPI(
-    title="NeuroKin API",
+    title="NeuroTwin API",
     description="Emotionally Intelligent Digital Twin System for Student Connection",
     version="0.1.0",
 )
@@ -153,10 +153,10 @@ def _sf_connect():
         account=os.environ["SNOWFLAKE_ACCOUNT"],
         user=os.environ["SNOWFLAKE_USER"],
         password=os.environ["SNOWFLAKE_PASSWORD"],
-        database=os.environ.get("SNOWFLAKE_DATABASE", "NEUROKIN_DB"),
+        database=os.environ.get("SNOWFLAKE_DATABASE", "NEUROTWIN_DB"),
         schema=os.environ.get("SNOWFLAKE_SCHEMA", "PUBLIC"),
-        warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "NEUROKIN_WH"),
-        role=os.environ.get("SNOWFLAKE_ROLE", "NEUROKIN_APP_ROLE"),
+        warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "NEUROTWIN_WH"),
+        role=os.environ.get("SNOWFLAKE_ROLE", "NEUROTWIN_APP_ROLE"),
         client_session_keep_alive=True,
     )
 
@@ -357,7 +357,7 @@ class LoginPayload(BaseModel):
 
 def _hash_password(password: str) -> str:
     """Hash a password with SHA-256 + salt for storage."""
-    salt = "neurokin-salt-2026"  # In production, use per-user random salt
+    salt = "neurotwin-salt-2026"  # In production, use per-user random salt
     return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
 
 
@@ -852,7 +852,7 @@ class ExplanationChain:
             result = _demo_explain(me.top_themes, peer.top_themes, shared, score)
             return result.get("explanation", ""), result.get("icebreaker", "")
 
-        prompt = f"""You are NeuroKin, an emotionally intelligent student connection assistant.
+        prompt = f"""You are NeuroTwin, an emotionally intelligent student connection assistant.
 Given two student profiles (no raw journal text), explain why they are a good match
 and suggest one engaging icebreaker question.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeuroKin Demo Seed Script
+NeuroTwin Demo Seed Script
 =========================
 Creates multiple demo student accounts with journal entries, mood check‑ins,
 and activities so the app is immediately demonstrable.
@@ -318,14 +318,14 @@ def _seed_account(account: dict) -> None:
 # ---------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="Seed NeuroKin demo accounts")
+    parser = argparse.ArgumentParser(description="Seed NeuroTwin demo accounts")
     parser.add_argument("--url", default="http://localhost:8000", help="Backend base URL")
     args = parser.parse_args()
 
     global API_BASE
     API_BASE = args.url.rstrip("/")
 
-    print(f"NeuroKin Demo Seeder")
+    print(f"NeuroTwin Demo Seeder")
     print(f"Backend: {API_BASE}")
     print(f"Accounts: {len(DEMO_ACCOUNTS)}")
     print("=" * 40)

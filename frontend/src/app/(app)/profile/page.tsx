@@ -73,7 +73,7 @@ export default function ProfilePage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `neurokin-twin-${twin.student_id}.json`;
+    a.download = `neurotwin-twin-${twin.student_id}.json`;
     a.click();
     URL.revokeObjectURL(url);
     setToastMessage("Twin data exported successfully!");

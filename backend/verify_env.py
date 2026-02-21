@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-NeuroKin — Snowflake Environment Verifier
+NeuroTwin — Snowflake Environment Verifier
 ==========================================
 Run this after configuring your .env to confirm the backend can reach
-Snowflake and that every Cortex function NeuroKin depends on is working.
+Snowflake and that every Cortex function NeuroTwin depends on is working.
 
 Usage:
-    cd /home/colin/NeuroKin/backend
+    cd /home/colin/NeuroTwin/backend
     source .venv/bin/activate
     python verify_env.py
 """
@@ -80,10 +80,10 @@ def main() -> int:
             account=os.environ["SNOWFLAKE_ACCOUNT"],
             user=os.environ["SNOWFLAKE_USER"],
             password=os.environ["SNOWFLAKE_PASSWORD"],
-            database=os.environ.get("SNOWFLAKE_DATABASE", "NEUROKIN_DB"),
+            database=os.environ.get("SNOWFLAKE_DATABASE", "NEUROTWIN_DB"),
             schema=os.environ.get("SNOWFLAKE_SCHEMA", "PUBLIC"),
-            warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "NEUROKIN_WH"),
-            role=os.environ.get("SNOWFLAKE_ROLE", "NEUROKIN_APP_ROLE"),
+            warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "NEUROTWIN_WH"),
+            role=os.environ.get("SNOWFLAKE_ROLE", "NEUROTWIN_APP_ROLE"),
         )
         cur = conn.cursor()
     except Exception as e:
@@ -118,7 +118,7 @@ def main() -> int:
     found = {r[1].upper() for r in rows}  # column 1 = table name
 
     if expected_tables <= found:
-        ok("All 6 NeuroKin tables exist")
+        ok("All 6 NeuroTwin tables exist")
     else:
         missing_tables = expected_tables - found
         fail("Missing tables", ", ".join(sorted(missing_tables)))
@@ -180,7 +180,7 @@ def main() -> int:
         print(f"  {FAIL} {len(failures)} check(s) failed.{RESET}  Fix the above, then re-run.\n")
         return 1
     else:
-        print(f"  🎉  All checks passed! NeuroKin backend is fully wired to Snowflake.{RESET}")
+        print(f"  🎉  All checks passed! NeuroTwin backend is fully wired to Snowflake.{RESET}")
         print("     Start the server:  uvicorn main:app --reload\n")
         return 0
 
