@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 import json
 import math
+import time
 import random
 import hashlib
 import logging
@@ -30,8 +31,9 @@ from enum import Enum
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
@@ -62,6 +64,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+class TimingMiddleware(BaseHTTPMiddleware):
+    """Log request duration for every endpoint."""
+
+    async def dispatch(self, request: Request, call_next):
+        start = time.perf_counter()
+        response = await call_next(request)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "%s %s → %d  %.0fms",
+            request.method,
+            request.url.path,
+            response.status_code,
+            elapsed_ms,
+        )
+        response.headers["X-Response-Time-Ms"] = f"{elapsed_ms:.1f}"
+        return response
+
+
+app.add_middleware(TimingMiddleware)
+
 # ---------------------------------------------------------------------------
 # Snowflake Connection Pool (production) / In-Memory Store (demo)
 # ---------------------------------------------------------------------------
@@ -73,7 +96,10 @@ _demo_store: dict[str, dict] = {
     "mood_checkins": [],
     "twin_snapshots": {},
     "matches": [],
+    "blocks": [],
     "safety_reports": [],
+    "onboarding_responses": [],
+    "notifications": [],
 }
 
 # SQL constants
@@ -676,23 +702,28 @@ class MatchRetrievalChain:
 
         # 2 — Candidate retrieval
         if DEMO_MODE:
+            # Gather blocked peer IDs
+            blocked_ids = {b["blocked_id"] for b in _demo_store["blocks"] if b["blocker_id"] == student_id}
             # In demo mode compute compatibility against all other twins in memory
             all_twins = [
                 t for sid, t in _demo_store["twin_snapshots"].items()
-                if sid != student_id
+                if sid != student_id and sid not in blocked_ids
             ]
         else:
             candidates = _execute(
                 """
-                SELECT *,
-                      VECTOR_COSINE_SIMILARITY(twin_embedding::VECTOR(FLOAT, 768), PARSE_JSON(%s)::VECTOR(FLOAT, 768)) AS vec_sim
-                FROM twin_snapshots
-                  WHERE student_id != %s
-                    AND twin_embedding IS NOT NULL
+                SELECT t.*,
+                      VECTOR_COSINE_SIMILARITY(t.twin_embedding::VECTOR(FLOAT, 768), PARSE_JSON(%s)::VECTOR(FLOAT, 768)) AS vec_sim
+                FROM twin_snapshots t
+                  WHERE t.student_id != %s
+                    AND t.twin_embedding IS NOT NULL
+                    AND t.student_id NOT IN (
+                        SELECT blocked_id FROM blocks WHERE blocker_id = %s
+                    )
                 ORDER BY vec_sim DESC
                 LIMIT %s
                 """,
-                (json.dumps(me.twin_embedding), student_id, top_k * 2),
+                (json.dumps(me.twin_embedding), student_id, student_id, top_k * 2),
                 fetch=True,
             )
             all_twins = [_row_to_twin(row) for row in candidates]
@@ -826,15 +857,17 @@ def _row_to_twin(row: dict) -> TwinSnapshot:
 
 BOOTSTRAP_SQL = """
 CREATE TABLE IF NOT EXISTS students (
-    student_id     VARCHAR(64) PRIMARY KEY,
+    student_id     VARCHAR(64)  PRIMARY KEY,
     display_name   VARCHAR(128),
     email_hash     VARCHAR(128),
-    created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+    onboarded      BOOLEAN      DEFAULT FALSE,
+    created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    updated_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
 CREATE TABLE IF NOT EXISTS journal_entries (
-    id             VARCHAR(64) DEFAULT UUID_STRING(),
-    student_id     VARCHAR(64) REFERENCES students(student_id),
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    student_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
     text_encrypted VARCHAR(16777216),
     mood_label     VARCHAR(32),
     tags           VARIANT,
@@ -843,9 +876,9 @@ CREATE TABLE IF NOT EXISTS journal_entries (
 );
 
 CREATE TABLE IF NOT EXISTS mood_checkins (
-    id             VARCHAR(64) DEFAULT UUID_STRING(),
-    student_id     VARCHAR(64) REFERENCES students(student_id),
-    mood_label     VARCHAR(32) NOT NULL,
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    student_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    mood_label     VARCHAR(32)  NOT NULL,
     energy_level   INT,
     stress_level   INT,
     social_battery INT,
@@ -854,23 +887,24 @@ CREATE TABLE IF NOT EXISTS mood_checkins (
 );
 
 CREATE TABLE IF NOT EXISTS twin_snapshots (
-    student_id            VARCHAR(64) PRIMARY KEY,
+    student_id            VARCHAR(64) PRIMARY KEY REFERENCES students(student_id),
     display_name          VARCHAR(128),
     twin_embedding        VARIANT,
     emotion_distribution  VARIANT,
     top_themes            VARIANT,
     activity_preferences  VARIANT,
-    mood_stability        FLOAT,
-    social_energy         FLOAT,
+    mood_stability        FLOAT      DEFAULT 0,
+    social_energy         FLOAT      DEFAULT 0,
     shared_values_tags    VARIANT,
-    schedule_overlap      FLOAT DEFAULT 0,
+    schedule_overlap      FLOAT      DEFAULT 0,
+    version               INT        DEFAULT 1,
     last_updated          TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
 CREATE TABLE IF NOT EXISTS matches (
-    id             VARCHAR(64) DEFAULT UUID_STRING(),
-    student_a      VARCHAR(64),
-    student_b      VARCHAR(64),
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    student_a      VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    student_b      VARCHAR(64)  NOT NULL REFERENCES students(student_id),
     score          FLOAT,
     explanation    VARCHAR(2000),
     icebreaker     VARCHAR(500),
@@ -878,12 +912,44 @@ CREATE TABLE IF NOT EXISTS matches (
     created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
+CREATE TABLE IF NOT EXISTS blocks (
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    blocker_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    blocked_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+
 CREATE TABLE IF NOT EXISTS safety_reports (
-    id             VARCHAR(64) DEFAULT UUID_STRING(),
-    reporter_id    VARCHAR(64),
-    reported_id    VARCHAR(64),
-    reason         VARCHAR(1000),
-    resolved       BOOLEAN DEFAULT FALSE,
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    reporter_id    VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    reported_id    VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    reason         VARCHAR(1000) NOT NULL,
+    category       VARCHAR(32)  DEFAULT 'OTHER',
+    resolved       BOOLEAN      DEFAULT FALSE,
+    resolved_by    VARCHAR(64),
+    resolved_at    TIMESTAMP_NTZ,
+    created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+
+CREATE TABLE IF NOT EXISTS onboarding_responses (
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    student_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    selected_mood  VARCHAR(32),
+    energy_level   INT,
+    social_battery INT,
+    activities     VARIANT,
+    values         VARIANT,
+    journal_text   VARCHAR(5000),
+    completed_at   TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    student_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    type           VARCHAR(32)  NOT NULL,
+    title          VARCHAR(256),
+    body           VARCHAR(1000),
+    read           BOOLEAN      DEFAULT FALSE,
     created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 """
@@ -1162,18 +1228,17 @@ async def post_feedback(payload: FeedbackPayload):
 async def post_block(payload: BlockPayload):
     """Block a peer — they will never appear in recommendations again."""
     record = {
-        "reporter_id": payload.student_id,
-        "reported_id": payload.blocked_id,
-        "reason": "BLOCK",
+        "blocker_id": payload.student_id,
+        "blocked_id": payload.blocked_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     if DEMO_MODE:
-        _demo_store["safety_reports"].append(record)
+        _demo_store["blocks"].append(record)
     else:
         _execute(
             """
-            INSERT INTO safety_reports (reporter_id, reported_id, reason)
-            VALUES (%s, %s, 'BLOCK')
+            INSERT INTO blocks (blocker_id, blocked_id)
+            VALUES (%s, %s)
             """,
             (payload.student_id, payload.blocked_id),
         )
@@ -1187,6 +1252,7 @@ async def post_report(payload: ReportPayload):
         "reporter_id": payload.student_id,
         "reported_id": payload.reported_id,
         "reason": payload.reason,
+        "category": "OTHER",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     if DEMO_MODE:
@@ -1194,8 +1260,8 @@ async def post_report(payload: ReportPayload):
     else:
         _execute(
             """
-            INSERT INTO safety_reports (reporter_id, reported_id, reason)
-            VALUES (%s, %s, %s)
+            INSERT INTO safety_reports (reporter_id, reported_id, reason, category)
+            VALUES (%s, %s, %s, 'OTHER')
             """,
             (payload.student_id, payload.reported_id, payload.reason),
         )
