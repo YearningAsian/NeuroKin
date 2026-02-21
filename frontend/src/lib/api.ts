@@ -9,6 +9,32 @@ async function parseResponse<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// --- Auth ---
+
+export interface AuthResponse {
+  status: string;
+  student_id: string;
+  display_name: string;
+}
+
+export async function signup(studentId: string, displayName: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ student_id: studentId, display_name: displayName, password }),
+  });
+  return parseResponse(res);
+}
+
+export async function login(studentId: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ student_id: studentId, password }),
+  });
+  return parseResponse(res);
+}
+
 export interface JournalEntry {
   student_id: string;
   text: string;

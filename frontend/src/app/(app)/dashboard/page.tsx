@@ -16,7 +16,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { getTwin, getRecommendations } from "@/lib/api";
-import { DEMO_STUDENT_ID } from "@/lib/user";
+import { useAuth } from "@/lib/auth";
 import { useFetch } from "@/hooks/useFetch";
 
 const moodHistory = [
@@ -30,8 +30,10 @@ const moodHistory = [
 ];
 
 export default function DashboardPage() {
-  const { data: twin, loading: twinLoading } = useFetch(() => getTwin(DEMO_STUDENT_ID));
-  const { data: recommendations, loading: recommendationsLoading } = useFetch(() => getRecommendations(DEMO_STUDENT_ID));
+  const { user } = useAuth();
+  const studentId = user?.studentId ?? "";
+  const { data: twin, loading: twinLoading } = useFetch(() => getTwin(studentId));
+  const { data: recommendations, loading: recommendationsLoading } = useFetch(() => getRecommendations(studentId));
 
   const recentMatches = (recommendations ?? []).slice(0, 3);
 

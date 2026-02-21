@@ -342,6 +342,30 @@ class ConsentPayload(BaseModel):
     consented: bool = True
 
 
+class SignupPayload(BaseModel):
+    """Payload for POST /signup."""
+    student_id: str = Field(..., min_length=3, max_length=64, description="Unique username")
+    display_name: str = Field(..., min_length=1, max_length=128)
+    password: str = Field(..., min_length=4, max_length=128)
+
+
+class LoginPayload(BaseModel):
+    """Payload for POST /login."""
+    student_id: str
+    password: str
+
+
+def _hash_password(password: str) -> str:
+    """Hash a password with SHA-256 + salt for storage."""
+    salt = "neurokin-salt-2026"  # In production, use per-user random salt
+    return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    """Check a password against its stored hash."""
+    return _hash_password(password) == stored_hash
+
+
 # ---------------------------------------------------------------------------
 # Snowflake Cortex Helpers (with demo-mode fallbacks)
 # ---------------------------------------------------------------------------
@@ -939,6 +963,7 @@ CREATE TABLE IF NOT EXISTS students (
     student_id     VARCHAR(64)  PRIMARY KEY,
     display_name   VARCHAR(128),
     email_hash     VARCHAR(128),
+    password_hash  VARCHAR(128),
     onboarded      BOOLEAN      DEFAULT FALSE,
     created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
     updated_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
@@ -1115,6 +1140,14 @@ def _seed_demo_data():
     ]
 
     for p in profiles:
+        # Create student record with password (demo password = "demo")
+        _demo_store["students"][p["id"]] = {
+            "student_id": p["id"],
+            "display_name": p["name"],
+            "password_hash": _hash_password("demo"),
+            "onboarded": True,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
         # Build a pseudo-text to generate a deterministic embedding
         seed_text = f"{p['name']} cares about {', '.join(p['themes'][:3])}. " \
                     f"Values: {', '.join(p['values'])}. Activities: {', '.join(p['activities'])}."
@@ -1524,6 +1557,83 @@ async def delete_account(student_id: str = Query(...)):
             _execute(stmt, tuple([student_id] * param_count))
         _execute("DELETE FROM students WHERE student_id = %s", (student_id,))
     return {"status": "ok", "deleted": student_id}
+
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+
+@app.post("/signup", tags=["Auth"])
+async def signup(payload: SignupPayload):
+    """
+    Create a new student account.
+    Returns the student_id + display_name on success.
+    """
+    pw_hash = _hash_password(payload.password)
+
+    if DEMO_MODE:
+        if payload.student_id in _demo_store.get("students", {}):
+            raise HTTPException(409, "Account already exists.")
+        _demo_store["students"][payload.student_id] = {
+            "student_id": payload.student_id,
+            "display_name": payload.display_name,
+            "password_hash": pw_hash,
+            "onboarded": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+    else:
+        # Check if already exists
+        existing = _execute(
+            "SELECT student_id FROM students WHERE student_id = %s",
+            (payload.student_id,),
+            fetch=True,
+        )
+        if existing:
+            raise HTTPException(409, "Account already exists.")
+        _execute(
+            """
+            INSERT INTO students (student_id, display_name, email_hash, password_hash, onboarded)
+            VALUES (%s, %s, '', %s, FALSE)
+            """,
+            (payload.student_id, payload.display_name, pw_hash),
+        )
+
+    return {
+        "status": "ok",
+        "student_id": payload.student_id,
+        "display_name": payload.display_name,
+    }
+
+
+@app.post("/login", tags=["Auth"])
+async def login(payload: LoginPayload):
+    """
+    Authenticate a student. Returns student info on success.
+    """
+    pw_hash = _hash_password(payload.password)
+
+    if DEMO_MODE:
+        student = _demo_store.get("students", {}).get(payload.student_id)
+        if not student or student.get("password_hash") != pw_hash:
+            raise HTTPException(401, "Invalid credentials.")
+        return {
+            "status": "ok",
+            "student_id": payload.student_id,
+            "display_name": student.get("display_name", payload.student_id),
+        }
+    else:
+        rows = _execute(
+            "SELECT student_id, display_name, password_hash FROM students WHERE student_id = %s",
+            (payload.student_id,),
+            fetch=True,
+        )
+        if not rows or rows[0].get("password_hash") != pw_hash:
+            raise HTTPException(401, "Invalid credentials.")
+        return {
+            "status": "ok",
+            "student_id": rows[0]["student_id"],
+            "display_name": rows[0].get("display_name", payload.student_id),
+        }
 
 
 # ---------------------------------------------------------------------------

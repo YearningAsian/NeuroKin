@@ -8,7 +8,7 @@ import { Toast } from "@/components/ui/Toast";
 import { SmilePlus, Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { submitMood } from "@/lib/api";
-import { DEMO_STUDENT_ID } from "@/lib/user";
+import { useAuth } from "@/lib/auth";
 
 const moods = [
   { emoji: "😊", label: "Happy", color: "bg-amber-100 border-amber-300 hover:bg-amber-200" },
@@ -22,6 +22,8 @@ const moods = [
 ];
 
 export default function MoodPage() {
+  const { user } = useAuth();
+  const studentId = user?.studentId ?? "";
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [energy, setEnergy] = useState(5);
   const [stress, setStress] = useState(5);
@@ -35,7 +37,7 @@ export default function MoodPage() {
     setSubmitting(true);
     try {
       await submitMood({
-        student_id: DEMO_STUDENT_ID,
+        student_id: studentId,
         mood_label: selectedMood.toLowerCase(),
         energy_level: energy,
         stress_level: stress,

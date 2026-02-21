@@ -21,8 +21,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { submitJournal, submitMood } from "@/lib/api";
-import { DEMO_STUDENT_ID } from "@/lib/user";
+import { submitJournal, submitMood, signup } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 const moodOptions = [
   { emoji: "😊", label: "Happy", color: "bg-amber-100 border-amber-300" },
@@ -58,8 +58,12 @@ const valueOptions = [
 ];
 
 export default function OnboardingPage() {
+  const { login: authLogin } = useAuth();
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [signupError, setSignupError] = useState("");
   const [selectedMood, setSelectedMood] = useState("");
   const [energyLevel, setEnergyLevel] = useState(5);
   const [socialBattery, setSocialBattery] = useState(5);
@@ -98,20 +102,49 @@ export default function OnboardingPage() {
       </div>
     </div>,
 
-    // Step 1: Name
+    // Step 1: Account creation
     <div key="name" className="animate-fade-in-up max-w-md mx-auto">
       <Smile className="w-10 h-10 text-[var(--color-primary)] mb-4" />
-      <h2 className="text-2xl font-bold mb-2">What should we call you?</h2>
+      <h2 className="text-2xl font-bold mb-2">Create your account</h2>
       <p className="text-[var(--color-text-muted)] text-sm mb-6">
-        Just a display name — this is what peers will see.
+        Pick a username and password to get started.
       </p>
-      <input
-        type="text"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Your first name or nickname"
-        className="w-full px-5 py-3 rounded-xl border border-[var(--color-border)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-      />
+      {signupError && (
+        <div className="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-sm">{signupError}</div>
+      )}
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Display Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Your first name or nickname"
+            className="w-full px-5 py-3 rounded-xl border border-[var(--color-border)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Username</label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, ""))}
+            placeholder="e.g. alex-t"
+            className="w-full px-5 py-3 rounded-xl border border-[var(--color-border)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+          />
+          <p className="text-xs text-[var(--color-text-muted)] mt-1">Letters, numbers, hyphens, and underscores only</p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="At least 4 characters"
+            className="w-full px-5 py-3 rounded-xl border border-[var(--color-border)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+          />
+        </div>
+      </div>
     </div>,
 
     // Step 2: Current mood
@@ -291,9 +324,14 @@ export default function OnboardingPage() {
     if (submitting) return;
     setSubmitting(true);
     try {
+      // Create the account first
+      const result = await signup(username, name, password);
+      authLogin(result.student_id, result.display_name);
+
+      // Submit initial mood + journal under the new account
       if (selectedMood) {
         await submitMood({
-          student_id: DEMO_STUDENT_ID,
+          student_id: result.student_id,
           mood_label: selectedMood.toLowerCase(),
           energy_level: energyLevel,
           stress_level: 5,
@@ -302,7 +340,7 @@ export default function OnboardingPage() {
       }
       if (journalText.trim()) {
         await submitJournal({
-          student_id: DEMO_STUDENT_ID,
+          student_id: result.student_id,
           text: journalText,
           mood_label: selectedMood?.toLowerCase(),
           tags: [...selectedActivities, ...selectedValues],
@@ -311,13 +349,26 @@ export default function OnboardingPage() {
       setStep(step + 1);
     } catch (err) {
       console.error("Onboarding submit failed:", err);
-      setStep(step + 1);
+      const msg = err instanceof Error ? err.message : "Signup failed";
+      if (msg.includes("409")) {
+        setSignupError("That username is already taken. Please go back and pick a different one.");
+      } else {
+        setSignupError(msg);
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleNext = () => {
+    // Validate account step
+    if (step === 1) {
+      if (!name.trim() || !username.trim() || password.length < 4) {
+        setSignupError("Please fill in all fields. Password must be at least 4 characters.");
+        return;
+      }
+      setSignupError("");
+    }
     if (step === totalSteps - 2) {
       finishOnboarding();
     } else {

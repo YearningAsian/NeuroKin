@@ -99,7 +99,7 @@ export default function LandingPage() {
             <a href="#safety" className="hover:text-[var(--color-text)]">Safety</a>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/dashboard">
+            <Link href="/login">
               <Button variant="ghost" size="sm">Log in</Button>
             </Link>
             <Link href="/onboarding">

@@ -25,7 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { getTwin, deleteAccount, submitConsent } from "@/lib/api";
-import { DEMO_STUDENT_ID } from "@/lib/user";
+import { useAuth } from "@/lib/auth";
 import { useFetch } from "@/hooks/useFetch";
 
 const emotionColors: Record<string, string> = {
@@ -45,7 +45,9 @@ const emotionColors: Record<string, string> = {
 };
 
 export default function ProfilePage() {
-  const { data: twin, loading } = useFetch(() => getTwin(DEMO_STUDENT_ID));
+  const { user, logout } = useAuth();
+  const studentId = user?.studentId ?? "";
+  const { data: twin, loading } = useFetch(() => getTwin(studentId));
   const [toastMessage, setToastMessage] = useState("");
   const [showToast, setShowToast] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -82,13 +84,14 @@ export default function ProfilePage() {
   const handleDeleteAccount = async () => {
     setDeleting(true);
     try {
-      await deleteAccount(DEMO_STUDENT_ID);
+      await deleteAccount(studentId);
       setShowDeleteConfirm(false);
       setToastMessage("Account deleted. All data has been removed.");
       setShowToast(true);
       setTimeout(() => {
         setShowToast(false);
-        window.location.href = "/";
+        logout();
+        window.location.href = "/login";
       }, 2000);
     } catch (err) {
       console.error("Delete failed:", err);
@@ -103,7 +106,7 @@ export default function ProfilePage() {
   const handleConsentToggle = async () => {
     const newConsent = !consentGranted;
     try {
-      await submitConsent(DEMO_STUDENT_ID, newConsent);
+      await submitConsent(studentId, newConsent);
       setConsentGranted(newConsent);
       setToastMessage(newConsent ? "Data processing re-enabled." : "Data processing paused.");
       setShowToast(true);

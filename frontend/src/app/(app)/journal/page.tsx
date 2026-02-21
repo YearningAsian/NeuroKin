@@ -9,7 +9,7 @@ import { Toast } from "@/components/ui/Toast";
 import { BookHeart, Send, Lock, Clock, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { submitJournal, getJournalEntries, type JournalEntryPreview } from "@/lib/api";
-import { DEMO_STUDENT_ID } from "@/lib/user";
+import { useAuth } from "@/lib/auth";
 import { useFetch } from "@/hooks/useFetch";
 
 const prompts = [
@@ -33,6 +33,8 @@ const MOOD_EMOJI: Record<string, string> = {
 };
 
 export default function JournalPage() {
+  const { user } = useAuth();
+  const studentId = user?.studentId ?? "";
   const [text, setText] = useState("");
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -40,9 +42,9 @@ export default function JournalPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const fetcher = useCallback(
-    () => getJournalEntries(DEMO_STUDENT_ID),
+    () => getJournalEntries(studentId),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refreshKey],
+    [refreshKey, studentId],
   );
   const { data: entries, loading: entriesLoading } = useFetch(fetcher);
 
@@ -50,7 +52,7 @@ export default function JournalPage() {
     if (!text.trim() || submitting) return;
     setSubmitting(true);
     try {
-      await submitJournal({ student_id: DEMO_STUDENT_ID, text });
+      await submitJournal({ student_id: studentId, text });
       setSubmitted(true);
       setTimeout(() => setSubmitted(false), 3000);
       setText("");

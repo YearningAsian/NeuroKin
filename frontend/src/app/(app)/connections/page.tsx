@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getRecommendations, submitFeedback, reportUser, type PeerRecommendation } from "@/lib/api";
-import { DEMO_STUDENT_ID } from "@/lib/user";
+import { useAuth } from "@/lib/auth";
 import { useFetch } from "@/hooks/useFetch";
 
 const avatarColors = [
@@ -50,19 +50,21 @@ function ScoreBadge({ score }: { score: number }) {
 function MatchCardInner({ match, colorIdx }: { match: PeerRecommendation; colorIdx: number }) {
   const [expanded, setExpanded] = useState(false);
   const [accepted, setAccepted] = useState<boolean | null>(null);
+  const { user } = useAuth();
+  const studentId = user?.studentId ?? "";
   const avatarColor = avatarColors[colorIdx % avatarColors.length];
   const score = Math.round(match.compatibility_score);
 
   const handleConnect = async () => {
     setAccepted(true);
-    await submitFeedback(DEMO_STUDENT_ID, match.peer_id, true).catch(console.error);
+    await submitFeedback(studentId, match.peer_id, true).catch(console.error);
   };
   const handleSkip = async () => {
     setAccepted(false);
-    await submitFeedback(DEMO_STUDENT_ID, match.peer_id, false).catch(console.error);
+    await submitFeedback(studentId, match.peer_id, false).catch(console.error);
   };
   const handleReport = async () => {
-    await reportUser(DEMO_STUDENT_ID, match.peer_id, "Reported from connections page").catch(console.error);
+    await reportUser(studentId, match.peer_id, "Reported from connections page").catch(console.error);
   };
 
   if (accepted === false) return null;
@@ -179,7 +181,9 @@ function MatchCardInner({ match, colorIdx }: { match: PeerRecommendation; colorI
 const MatchCard = memo(MatchCardInner);
 
 export default function ConnectionsPage() {
-  const { data, loading } = useFetch(() => getRecommendations(DEMO_STUDENT_ID));
+  const { user } = useAuth();
+  const studentId = user?.studentId ?? "";
+  const { data, loading } = useFetch(() => getRecommendations(studentId));
   const matches = data ?? [];
 
   if (loading) return <LoadingSpinner color="text-[var(--color-accent)]" />;

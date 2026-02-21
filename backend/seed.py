@@ -15,7 +15,13 @@ Usage:
     # Or with a custom base URL:
     #   python seed.py --url http://localhost:8000
 
-Accounts created:  (password-less, just use the student_id in the UI)
+Accounts created:  (password: demo)
+  demo-alex    — Curious, creative, AI & music
+  demo-jordan  — Empathetic writer, yoga & mindfulness
+  demo-sam     — Energetic, entrepreneurial, sports & coding
+  demo-riley   — Calm, scholarly, astronomy & meditation
+  demo-casey   — Determined techie, gaming & robotics
+  demo-morgan  — Compassionate activist, dance & poetry
   demo-alex    — curious CS student into AI and music
   demo-jordan  — empathetic psych major, loves writing
   demo-sam     — energetic entrepreneur, fitness buff
@@ -43,6 +49,7 @@ API_BASE = "http://localhost:8000"
 DEMO_ACCOUNTS = [
     {
         "student_id": "demo-alex",
+        "display_name": "Alex",
         "journal_entries": [
             {
                 "text": "I've been really excited about my AI class project. We're building a recommendation system and the math behind collaborative filtering is beautiful. Spent the afternoon coding and lost track of time — in the best way. Also went for a run afterwards and feel great.",
@@ -73,6 +80,7 @@ DEMO_ACCOUNTS = [
     },
     {
         "student_id": "demo-jordan",
+        "display_name": "Jordan",
         "journal_entries": [
             {
                 "text": "Volunteered at the community centre today. The kids are so resilient — they teach me way more than I teach them. Journaling about it helped me process some big feelings about privilege and purpose.",
@@ -103,6 +111,7 @@ DEMO_ACCOUNTS = [
     },
     {
         "student_id": "demo-sam",
+        "display_name": "Sam",
         "journal_entries": [
             {
                 "text": "Pitched my startup idea in class today — an app that matches study groups by learning style. Got great feedback! Nervous but excited to build the prototype this weekend.",
@@ -133,6 +142,7 @@ DEMO_ACCOUNTS = [
     },
     {
         "student_id": "demo-riley",
+        "display_name": "Riley",
         "journal_entries": [
             {
                 "text": "Stargazing from the hill last night was magical. The Milky Way was crystal clear. There's a deep comfort in knowing how vast the universe is — my problems feel so small and manageable.",
@@ -163,6 +173,7 @@ DEMO_ACCOUNTS = [
     },
     {
         "student_id": "demo-casey",
+        "display_name": "Casey",
         "journal_entries": [
             {
                 "text": "Made a breakthrough on my robotics project — the arm can now pick up objects with 95% accuracy! The debugging took days but that moment of success was worth every frustrated hour.",
@@ -193,6 +204,7 @@ DEMO_ACCOUNTS = [
     },
     {
         "student_id": "demo-morgan",
+        "display_name": "Morgan",
         "journal_entries": [
             {
                 "text": "Organised a poetry slam for the diversity week. Hearing people share their stories through verse was deeply moving. Poetry has this power to connect strangers at the soul level.",
@@ -240,7 +252,21 @@ def _post(path: str, data: dict) -> dict:
 
 def _seed_account(account: dict) -> None:
     sid = account["student_id"]
+    name = account.get("display_name", sid)
     print(f"\n── Seeding {sid} ──")
+
+    # 0) Create the account using /signup (password = "demo")
+    signup_result = _post("/signup", {
+        "student_id": sid,
+        "display_name": name,
+        "password": "demo",
+    })
+    if signup_result.get("status") == "ok":
+        print("  ✓ Account created (password: demo)")
+    elif "409" in str(signup_result):
+        print("  ⊘ Account already exists, continuing…")
+    else:
+        print(f"  ✓ Signup: {signup_result}")
 
     # 1) Submit journals (which also build the twin)
     for i, entry in enumerate(account["journal_entries"]):
@@ -319,14 +345,14 @@ def main():
 
     print(f"\n{'=' * 40}")
     print(f"✓ Seeded {len(DEMO_ACCOUNTS)} accounts in {elapsed:.1f}s")
-    print(f"\nDemo accounts:")
+    print(f"\nDemo accounts (password: demo):")
     for acc in DEMO_ACCOUNTS:
         sid = acc["student_id"]
         n_j = len(acc["journal_entries"])
         n_m = len(acc["mood_checkins"])
         n_a = len(acc["activities"])
         print(f"  • {sid:15s}  {n_j} journals, {n_m} moods, {n_a} activities")
-    print(f"\nSet NEXT_PUBLIC_DEMO_STUDENT_ID to any of the above in frontend/.env.local")
+    print(f"\nLog in at /login with any account above. Password: demo")
 
 
 if __name__ == "__main__":
