@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Toast } from "@/components/ui/Toast";
 import { BookHeart, Send, Lock, Clock, Loader2, Mic, MicOff } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { submitJournal, getJournalEntries, type JournalEntryPreview } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useFetch } from "@/hooks/useFetch";
@@ -64,20 +63,39 @@ export default function JournalPage() {
   const { user } = useAuth();
   const studentId = user?.studentId ?? "";
   const [text, setText] = useState("");
-  const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [entriesLimit, setEntriesLimit] = useState(5);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const suggestionsRef = useRef<HTMLDivElement | null>(null);
   const speechSupported =
     typeof window !== "undefined" &&
     !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
+  useEffect(() => {
+    const container = suggestionsRef.current;
+    if (!container) return;
+
+    const interval = window.setInterval(() => {
+      if (!container) return;
+      const maxScrollLeft = container.scrollWidth - container.clientWidth;
+      if (maxScrollLeft <= 0) return;
+      if (container.scrollLeft >= maxScrollLeft - 1) {
+        container.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        container.scrollBy({ left: 1, behavior: "auto" });
+      }
+    }, 25);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
   const fetcher = useCallback(
-    () => getJournalEntries(studentId),
+    () => getJournalEntries(studentId, entriesLimit),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refreshKey, studentId],
+    [refreshKey, studentId, entriesLimit],
   );
   const { data: entries, loading: entriesLoading } = useFetch(fetcher);
 
@@ -89,7 +107,6 @@ export default function JournalPage() {
       setSubmitted(true);
       setTimeout(() => setSubmitted(false), 3000);
       setText("");
-      setSelectedPrompt(null);
       // Refresh entries list
       setRefreshKey((k) => k + 1);
     } catch (err) {
@@ -141,24 +158,15 @@ export default function JournalPage() {
         <p className="text-sm font-medium text-[var(--color-text-muted)] mb-3">
           Suggestions:
         </p>
-        <div className="overflow-x-auto pb-1">
+        <div ref={suggestionsRef} className="overflow-x-auto pb-1">
           <div className="inline-flex gap-2 min-w-max">
           {prompts.map((p) => (
-            <button
+            <div
               key={p}
-              onClick={() => {
-                setSelectedPrompt(p);
-                setText(p + "\n\n");
-              }}
-              className={cn(
-                "text-sm px-4 py-2 rounded-full border transition-all",
-                selectedPrompt === p
-                  ? "bg-[var(--color-primary-light)] border-[var(--color-primary)] text-[var(--color-text)]"
-                  : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-primary)] hover:bg-amber-50"
-              )}
+              className="text-sm px-4 py-2 rounded-full border border-[var(--color-border)] text-[var(--color-text-muted)] bg-white/70"
             >
               {p}
-            </button>
+            </div>
           ))}
           </div>
         </div>
@@ -215,10 +223,17 @@ export default function JournalPage() {
 
       {/* Past entries (real data from API) */}
       <div className="animate-fade-in-up">
-        <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <Clock className="w-5 h-5 text-[var(--color-text-muted)]" />
-          Recent Entries
-        </h2>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <Clock className="w-5 h-5 text-[var(--color-text-muted)]" />
+            {entriesLimit > 5 ? "All Entries" : "Recent Entries"}
+          </h2>
+          {entriesLimit <= 5 && (
+            <Button variant="ghost" size="sm" onClick={() => setEntriesLimit(100)}>
+              View all entries
+            </Button>
+          )}
+        </div>
         {entriesLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (

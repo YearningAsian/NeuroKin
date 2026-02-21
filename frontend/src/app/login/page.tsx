@@ -91,7 +91,7 @@ export default function LoginPage() {
               <Brain className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold">
-              Neuro<span className="text-[var(--color-primary)]">Kin</span>
+              Neuro<span className="text-[var(--color-primary)]">Twin</span>
             </span>
           </Link>
           <Link href="/onboarding">

@@ -44,7 +44,13 @@ const emotionColors: Record<string, string> = {
   gratitude: "bg-lime-400",
 };
 
-const twinAvatarOptions = ["Nova", "Atlas", "Echo", "Luna", "Sage", "Aster"];
+const defaultTwinAvatarOptions = ["Nova", "Atlas", "Echo", "Luna", "Sage", "Aster"];
+
+function buildAvatarOptions(): string[] {
+  const base = ["Nova", "Atlas", "Echo", "Luna", "Sage", "Aster", "Orion", "Lyra", "Vega", "Milo"];
+  const shuffled = [...base].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 6).map((name, idx) => `${name}-${Math.floor(Math.random() * 900) + 100 + idx}`);
+}
 
 const getThumbUrl = (seed: string) =>
   `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(seed)}`;
@@ -59,8 +65,11 @@ export default function ProfilePage() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [consentGranted, setConsentGranted] = useState(true);
-  const [twinName, setTwinName] = useState("My Twin");
-  const [twinSeed, setTwinSeed] = useState("Nova");
+  const [savedTwinName, setSavedTwinName] = useState("My Twin");
+  const [savedTwinSeed, setSavedTwinSeed] = useState("Nova");
+  const [draftTwinName, setDraftTwinName] = useState("My Twin");
+  const [draftTwinSeed, setDraftTwinSeed] = useState("Nova");
+  const [avatarOptions, setAvatarOptions] = useState(defaultTwinAvatarOptions);
   const [showCustomize, setShowCustomize] = useState(false);
 
   useEffect(() => {
@@ -68,26 +77,39 @@ export default function ProfilePage() {
     const savedTwinName = window.localStorage.getItem(`neurotwin_twin_name_${studentId}`);
     const savedTwinSeed = window.localStorage.getItem(`neurotwin_twin_seed_${studentId}`);
     if (savedTwinName) {
-      setTwinName(savedTwinName);
+      setSavedTwinName(savedTwinName);
+      setDraftTwinName(savedTwinName);
     }
     if (savedTwinSeed) {
-      setTwinSeed(savedTwinSeed);
+      setSavedTwinSeed(savedTwinSeed);
+      setDraftTwinSeed(savedTwinSeed);
     } else if (user?.displayName) {
-      setTwinSeed(user.displayName);
+      setSavedTwinSeed(user.displayName);
+      setDraftTwinSeed(user.displayName);
     }
   }, [studentId, user?.displayName]);
 
-  const handleTwinNameChange = (value: string) => {
-    setTwinName(value);
+  const handleSaveTwinProfile = () => {
+    const nextName = draftTwinName.trim() || "My Twin";
+    const nextSeed = draftTwinSeed.trim() || user?.displayName || "Nova";
+    setSavedTwinName(nextName);
+    setSavedTwinSeed(nextSeed);
+
     if (studentId) {
-      window.localStorage.setItem(`neurotwin_twin_name_${studentId}`, value);
+      window.localStorage.setItem(`neurotwin_twin_name_${studentId}`, nextName);
+      window.localStorage.setItem(`neurotwin_twin_seed_${studentId}`, nextSeed);
     }
+
+    setToastMessage("Twin profile saved.");
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2500);
   };
 
-  const handleTwinSeedChange = (value: string) => {
-    setTwinSeed(value);
-    if (studentId) {
-      window.localStorage.setItem(`neurotwin_twin_seed_${studentId}`, value);
+  const handleReshuffleAvatars = () => {
+    const nextOptions = buildAvatarOptions();
+    setAvatarOptions(nextOptions);
+    if (!nextOptions.includes(draftTwinSeed)) {
+      setDraftTwinSeed(nextOptions[0]);
     }
   };
 
@@ -178,12 +200,12 @@ export default function ProfilePage() {
         <CardContent className="py-8">
           <div className="flex items-center gap-6 mb-8">
             <img
-              src={getThumbUrl(twinSeed || twin.display_name)}
-              alt={twinName}
+              src={getThumbUrl(savedTwinSeed || twin.display_name)}
+              alt={savedTwinName}
               className="w-20 h-20 rounded-full border-2 border-white bg-white shadow-lg"
             />
             <div>
-              <h2 className="text-2xl font-extrabold">{twinName || "My Twin"}</h2>
+              <h2 className="text-2xl font-extrabold">{savedTwinName || "My Twin"}</h2>
               <p className="text-sm text-[var(--color-text-muted)]">
                 {twin.top_themes.length} themes · {twin.activity_preferences.length} activities
               </p>
@@ -202,23 +224,28 @@ export default function ProfilePage() {
                   Twin Name
                 </label>
                 <input
-                  value={twinName}
-                  onChange={(e) => handleTwinNameChange(e.target.value)}
+                  value={draftTwinName}
+                  onChange={(e) => setDraftTwinName(e.target.value)}
                   placeholder="My Twin"
                   className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
                 />
               </div>
               <div>
                 <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
-                  Thumb Avatar
+                  Twin Avatar
                 </p>
+                <div className="mb-3">
+                  <Button variant="outline" size="sm" onClick={handleReshuffleAvatars}>
+                    Reshuffle Thumbs
+                  </Button>
+                </div>
                 <div className="flex flex-wrap gap-2">
-                  {twinAvatarOptions.map((option) => (
+                  {avatarOptions.map((option) => (
                     <button
                       key={option}
-                      onClick={() => handleTwinSeedChange(option)}
+                      onClick={() => setDraftTwinSeed(option)}
                       className={`p-1.5 rounded-full border transition-colors ${
-                        twinSeed === option
+                        draftTwinSeed === option
                           ? "border-[var(--color-primary)] bg-[var(--color-primary-light)]"
                           : "border-[var(--color-border)] bg-white"
                       }`}
@@ -231,6 +258,9 @@ export default function ProfilePage() {
                     </button>
                   ))}
                 </div>
+              </div>
+              <div className="pt-1">
+                <Button size="sm" onClick={handleSaveTwinProfile}>Save Changes</Button>
               </div>
             </div>
           )}
@@ -268,8 +298,11 @@ export default function ProfilePage() {
             <CardDescription>How your emotions are distributed across journal entries</CardDescription>
           </CardHeader>
           <CardContent>
+            {Object.entries(twin.emotion_distribution ?? {}).length === 0 ? (
+              <p className="text-sm text-[var(--color-text-muted)]">Add journal entries to unlock emotion insights.</p>
+            ) : (
             <div className="space-y-3">
-              {Object.entries(twin.emotion_distribution)
+              {Object.entries(twin.emotion_distribution ?? {})
                 .sort(([, a], [, b]) => b - a)
                 .map(([emotion, value]) => (
                   <div key={emotion}>
@@ -288,6 +321,7 @@ export default function ProfilePage() {
                   </div>
                 ))}
             </div>
+            )}
           </CardContent>
         </Card>
 
@@ -301,10 +335,14 @@ export default function ProfilePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <TagList
-                tags={twin.top_themes}
-                tagClassName="bg-[var(--color-primary-light)] text-amber-800 text-sm px-4 py-2"
-              />
+              {twin.top_themes.length === 0 ? (
+                <p className="text-sm text-[var(--color-text-muted)]">Journal more to reveal core themes.</p>
+              ) : (
+                <TagList
+                  tags={twin.top_themes}
+                  tagClassName="bg-[var(--color-primary-light)] text-amber-800 text-sm px-4 py-2"
+                />
+              )}
             </CardContent>
           </Card>
 
@@ -313,10 +351,14 @@ export default function ProfilePage() {
               <CardTitle>Activity Preferences</CardTitle>
             </CardHeader>
             <CardContent>
-              <TagList
-                tags={twin.activity_preferences}
-                tagClassName="bg-blue-50 text-blue-700 border border-blue-200 text-sm px-4 py-2"
-              />
+              {twin.activity_preferences.length === 0 ? (
+                <p className="text-sm text-[var(--color-text-muted)]">Log activities to unlock preferences.</p>
+              ) : (
+                <TagList
+                  tags={twin.activity_preferences}
+                  tagClassName="bg-blue-50 text-blue-700 border border-blue-200 text-sm px-4 py-2"
+                />
+              )}
             </CardContent>
           </Card>
 
@@ -325,10 +367,14 @@ export default function ProfilePage() {
               <CardTitle>Core Values</CardTitle>
             </CardHeader>
             <CardContent>
-              <TagList
-                tags={twin.shared_values_tags ?? []}
-                tagClassName="bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm px-4 py-2"
-              />
+              {(twin.shared_values_tags ?? []).length === 0 ? (
+                <p className="text-sm text-[var(--color-text-muted)]">Complete onboarding values to see core values.</p>
+              ) : (
+                <TagList
+                  tags={twin.shared_values_tags ?? []}
+                  tagClassName="bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm px-4 py-2"
+                />
+              )}
             </CardContent>
           </Card>
         </div>

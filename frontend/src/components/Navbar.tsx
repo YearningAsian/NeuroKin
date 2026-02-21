@@ -45,7 +45,7 @@ export default function Navbar() {
             <Brain className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl font-bold text-[var(--color-text)]">
-            Neuro<span className="text-[var(--color-primary)]">Kin</span>
+            Neuro<span className="text-[var(--color-primary)]">Twin</span>
           </span>
         </Link>
 

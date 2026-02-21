@@ -489,6 +489,26 @@ export default function LandingPage() {
   const heroRef = useRef<HTMLElement>(null);
   const heroY = useParallax(heroRef, 50);
 
+  const scrollToSection = useCallback((id: string) => {
+    if (typeof window === "undefined") return;
+    const target = document.getElementById(id);
+    if (!target) return;
+
+    const headerOffset = 76;
+    const getTop = () => target.getBoundingClientRect().top + window.scrollY - headerOffset;
+    const top = Math.max(0, getTop());
+
+    window.history.replaceState(null, "", `#${id}`);
+    window.scrollTo({ top, behavior: "smooth" });
+
+    window.setTimeout(() => {
+      const correctedTop = Math.max(0, getTop());
+      if (Math.abs(window.scrollY - correctedTop) > 2) {
+        window.scrollTo({ top: correctedTop, behavior: "smooth" });
+      }
+    }, 420);
+  }, []);
+
   /* Responsive radius for the thought cloud orbit */
   const [cloudRadius, setCloudRadius] = useState(210);
   useEffect(() => {
@@ -516,11 +536,6 @@ export default function LandingPage() {
               Neuro<span className="text-[var(--color-primary)]">Twin</span>
             </span>
           </Link>
-          <div className="hidden md:flex items-center gap-8 text-sm text-slate-500">
-            <a href="#features" className="hover:text-slate-900 transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-slate-900 transition-colors">How It Works</a>
-            <a href="#testimonials" className="hover:text-slate-900 transition-colors">Stories</a>
-          </div>
           <div className="flex items-center gap-3">
             <Link href="/login">
               <Button variant="ghost" size="sm">Log in</Button>
@@ -562,12 +577,11 @@ export default function LandingPage() {
               AI-powered emotional connections
             </motion.div>
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1] max-w-4xl mx-auto">
-              Your emotional{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] via-orange-400 to-[var(--color-warm)] animate-gradient">
+              <span className="block">Your emotional</span>
+              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-[var(--color-warm)] animate-gradient">
                 digital twin
               </span>
-              <br />
-              finds your people
+              <span className="block">finds your people</span>
             </h1>
             <p className="mt-6 text-lg md:text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed">
               NeuroTwin builds a living model of your emotional self — then
@@ -578,7 +592,7 @@ export default function LandingPage() {
           {/* ── TWIN VISUALIZATION ── */}
           <motion.div
             style={{ y: heroY }}
-            className="relative w-full max-w-[700px] mx-auto"
+            className="relative w-full max-w-[700px] mx-auto mt-8 md:mt-12"
             /* Fixed aspect ratio container */
           >
             <div className="relative w-full" style={{ paddingBottom: "100%" }}>
@@ -676,7 +690,13 @@ export default function LandingPage() {
                 Build Your Twin
               </Button>
             </Link>
-            <a href="#how-it-works">
+            <a
+              href="#how-it-works"
+              onClick={(e) => {
+                e.preventDefault();
+                scrollToSection("how-it-works");
+              }}
+            >
               <Button variant="outline" size="lg">
                 See how it works
               </Button>
@@ -689,7 +709,7 @@ export default function LandingPage() {
       {/* ═══════════════ FEATURES ═══════════════ */}
       <section
         id="features"
-        className="relative bg-slate-50/50 py-20 md:py-0 md:h-screen md:sticky md:top-0 md:z-10 md:flex md:items-center md:shadow-xl"
+        className="relative scroll-mt-24 bg-slate-50/50 py-20 md:py-0 md:h-screen md:sticky md:top-0 md:z-10 md:flex md:items-center md:shadow-xl"
       >
         <div className="max-w-6xl mx-auto px-4 w-full pb-5 md:pt-15 md:pb-13">
           <FadeInWhenVisible>
@@ -744,7 +764,7 @@ export default function LandingPage() {
       {/* ═══════════════ HOW IT WORKS ═══════════════ */}
       <section
         id="how-it-works"
-        className="relative z-20 bg-white py-20 md:py-0 md:h-screen md:sticky md:top-0 md:flex md:items-center md:shadow-xl"
+        className="relative scroll-mt-24 z-20 bg-white/98 py-20 md:py-0 md:h-screen md:sticky md:top-0 md:flex md:items-center md:shadow-xl"
       >
         <div className="max-w-5xl mx-auto px-4 md:pt-20">
           <FadeInWhenVisible>
@@ -764,7 +784,7 @@ export default function LandingPage() {
               return (
                 <FadeInWhenVisible key={item.step} delay={i * 0.15}>
                   <motion.div
-                    className="relative bg-white rounded-3xl border border-slate-100 p-8 text-center shadow-sm h-full"
+                    className="relative bg-white/90 rounded-3xl border border-slate-100 p-8 text-center shadow-sm h-full"
                     whileHover={{ y: -6 }}
                   >
                     {/* Step watermark */}
@@ -904,7 +924,7 @@ export default function LandingPage() {
       {/* ═══════════════ TESTIMONIALS CAROUSEL ═══════════════ */}
       <section
         id="testimonials"
-        className="relative z-40 bg-white py-20 md:py-32"
+        className="relative scroll-mt-24 z-40 bg-white py-20 md:py-32"
       >
         <div className="max-w-6xl mx-auto px-4">
           <FadeInWhenVisible>
