@@ -1217,6 +1217,96 @@ async def post_journal(entry: JournalEntry):
     return {"status": "ok", "twin_updated": True}
 
 
+@app.get("/journal", tags=["Ingestion"])
+async def get_journal_entries(student_id: str = Query(...), limit: int = Query(20, ge=1, le=100)):
+    """Retrieve past journal entries for a student (decrypted)."""
+    if DEMO_MODE:
+        entries = [
+            e for e in _demo_store["journal_entries"]
+            if e["student_id"] == student_id
+        ]
+        entries.sort(key=lambda e: e.get("created_at", ""), reverse=True)
+        return [
+            {
+                "text": e["text"][:120] + ("..." if len(e["text"]) > 120 else ""),
+                "mood_label": e.get("mood_label"),
+                "tags": e.get("tags", []),
+                "created_at": e.get("created_at"),
+            }
+            for e in entries[:limit]
+        ]
+    rows = _execute(
+        """
+        SELECT text_encrypted, mood_label, tags, created_at
+        FROM journal_entries
+        WHERE student_id = %s
+        ORDER BY created_at DESC
+        LIMIT %s
+        """,
+        (student_id, limit),
+        fetch=True,
+    )
+    results = []
+    for row in rows:
+        raw = _decrypt(row.get("text_encrypted", ""))
+        preview = raw[:120] + ("..." if len(raw) > 120 else "")
+        tags_val = row.get("tags")
+        if isinstance(tags_val, str):
+            try:
+                tags_val = json.loads(tags_val)
+            except json.JSONDecodeError:
+                tags_val = []
+        results.append({
+            "text": preview,
+            "mood_label": row.get("mood_label"),
+            "tags": tags_val or [],
+            "created_at": str(row.get("created_at", "")),
+        })
+    return results
+
+
+@app.get("/mood/history", tags=["Ingestion"])
+async def get_mood_history(student_id: str = Query(...), limit: int = Query(7, ge=1, le=30)):
+    """Retrieve recent mood check-ins for a student (for dashboard chart)."""
+    if DEMO_MODE:
+        checkins = [
+            c for c in _demo_store["mood_checkins"]
+            if c["student_id"] == student_id
+        ]
+        checkins.sort(key=lambda c: c.get("created_at", ""), reverse=True)
+        return [
+            {
+                "mood_label": c["mood_label"],
+                "energy_level": c.get("energy_level"),
+                "stress_level": c.get("stress_level"),
+                "social_battery": c.get("social_battery"),
+                "created_at": c.get("created_at"),
+            }
+            for c in checkins[:limit]
+        ]
+    rows = _execute(
+        """
+        SELECT mood_label, energy_level, stress_level, social_battery, created_at
+        FROM mood_checkins
+        WHERE student_id = %s
+        ORDER BY created_at DESC
+        LIMIT %s
+        """,
+        (student_id, limit),
+        fetch=True,
+    )
+    return [
+        {
+            "mood_label": row.get("mood_label"),
+            "energy_level": row.get("energy_level"),
+            "stress_level": row.get("stress_level"),
+            "social_battery": row.get("social_battery"),
+            "created_at": str(row.get("created_at", "")),
+        }
+        for row in rows
+    ]
+
+
 @app.post("/mood", tags=["Ingestion"])
 async def post_mood(checkin: MoodCheckIn):
     """Submit a mood check-in.  Updates the twin's mood/energy dimensions."""

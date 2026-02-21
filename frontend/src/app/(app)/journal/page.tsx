@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Toast } from "@/components/ui/Toast";
 import { BookHeart, Send, Lock, Clock, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { submitJournal } from "@/lib/api";
+import { submitJournal, getJournalEntries, type JournalEntryPreview } from "@/lib/api";
 import { DEMO_STUDENT_ID } from "@/lib/user";
+import { useFetch } from "@/hooks/useFetch";
 
 const prompts = [
   "What's been on your mind today?",
@@ -19,32 +21,30 @@ const prompts = [
   "What would make tomorrow great?",
 ];
 
-const pastEntries = [
-  {
-    date: "Today, 2:30 PM",
-    preview: "I've been thinking about how much better I feel when I take time to...",
-    mood: "😌",
-    themes: ["Reflection", "Gratitude"],
-  },
-  {
-    date: "Yesterday, 9:15 PM",
-    preview: "Had a really interesting conversation in class today about...",
-    mood: "😊",
-    themes: ["Social", "Growth"],
-  },
-  {
-    date: "Feb 19, 4:00 PM",
-    preview: "Feeling a bit overwhelmed with deadlines but I know I can...",
-    mood: "😰",
-    themes: ["Stress", "Resilience"],
-  },
-];
+const MOOD_EMOJI: Record<string, string> = {
+  happy: "😊",
+  calm: "😌",
+  sad: "😔",
+  frustrated: "😤",
+  anxious: "😰",
+  reflective: "🤔",
+  tired: "😴",
+  excited: "🤩",
+};
 
 export default function JournalPage() {
   const [text, setText] = useState("");
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const fetcher = useCallback(
+    () => getJournalEntries(DEMO_STUDENT_ID),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [refreshKey],
+  );
+  const { data: entries, loading: entriesLoading } = useFetch(fetcher);
 
   const handleSubmit = async () => {
     if (!text.trim() || submitting) return;
@@ -55,6 +55,8 @@ export default function JournalPage() {
       setTimeout(() => setSubmitted(false), 3000);
       setText("");
       setSelectedPrompt(null);
+      // Refresh entries list
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       console.error("Journal submit failed:", err);
     } finally {
@@ -136,35 +138,71 @@ export default function JournalPage() {
         onDismiss={() => setSubmitted(false)}
       />
 
-      {/* Past entries */}
+      {/* Past entries (real data from API) */}
       <div className="animate-fade-in-up">
         <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
           <Clock className="w-5 h-5 text-[var(--color-text-muted)]" />
           Recent Entries
         </h2>
-        <div className="space-y-3">
-          {pastEntries.map((entry) => (
-            <Card key={entry.date} className="card-hover cursor-pointer">
-              <CardContent className="flex items-start gap-4 py-4">
-                <div className="text-2xl mt-1">{entry.mood}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-[var(--color-text-muted)] mb-1">{entry.date}</div>
-                  <p className="text-sm text-[var(--color-text)] truncate">{entry.preview}</p>
-                  <div className="flex gap-1.5 mt-2">
-                    {entry.themes.map((t) => (
-                      <span
-                        key={t}
-                        className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-[var(--color-text-muted)]"
-                      >
-                        {t}
-                      </span>
-                    ))}
+        {entriesLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardContent className="flex items-start gap-4 py-4 animate-pulse">
+                  <div className="w-8 h-8 rounded-full bg-slate-200 mt-1" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-24 bg-slate-200 rounded" />
+                    <div className="h-4 w-full bg-slate-200 rounded" />
+                    <div className="flex gap-1.5">
+                      <div className="h-5 w-14 bg-slate-200 rounded-full" />
+                      <div className="h-5 w-16 bg-slate-200 rounded-full" />
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (!entries || entries.length === 0) ? (
+          <EmptyState
+            icon={BookHeart}
+            title="No entries yet"
+            description="Write your first journal entry above to get started."
+          />
+        ) : (
+          <div className="space-y-3">
+            {entries.map((entry: JournalEntryPreview, idx: number) => (
+              <Card key={idx} className="card-hover">
+                <CardContent className="flex items-start gap-4 py-4">
+                  <div className="text-2xl mt-1">
+                    {MOOD_EMOJI[entry.mood_label ?? ""] ?? "📝"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-[var(--color-text-muted)] mb-1">
+                      {entry.created_at
+                        ? new Date(entry.created_at).toLocaleString()
+                        : "Recent"}
+                    </div>
+                    <p className="text-sm text-[var(--color-text)] truncate">
+                      {entry.text}
+                    </p>
+                    {entry.tags.length > 0 && (
+                      <div className="flex gap-1.5 mt-2">
+                        {entry.tags.slice(0, 4).map((t) => (
+                          <span
+                            key={t}
+                            className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-[var(--color-text-muted)]"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

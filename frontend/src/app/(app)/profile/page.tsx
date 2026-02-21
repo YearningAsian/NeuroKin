@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TagList } from "@/components/ui/TagList";
+import { Toast } from "@/components/ui/Toast";
 import {
   Brain,
   TrendingUp,
@@ -17,8 +19,12 @@ import {
   Settings,
   Download,
   Trash2,
+  Loader2,
+  AlertTriangle,
+  CheckCircle2,
+  X,
 } from "lucide-react";
-import { getTwin } from "@/lib/api";
+import { getTwin, deleteAccount, submitConsent } from "@/lib/api";
 import { DEMO_STUDENT_ID } from "@/lib/user";
 import { useFetch } from "@/hooks/useFetch";
 
@@ -40,6 +46,72 @@ const emotionColors: Record<string, string> = {
 
 export default function ProfilePage() {
   const { data: twin, loading } = useFetch(() => getTwin(DEMO_STUDENT_ID));
+  const [toastMessage, setToastMessage] = useState("");
+  const [showToast, setShowToast] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [consentGranted, setConsentGranted] = useState(true);
+
+  const handleExportData = () => {
+    if (!twin) return;
+    const exportData = {
+      student_id: twin.student_id,
+      display_name: twin.display_name,
+      emotion_distribution: twin.emotion_distribution,
+      top_themes: twin.top_themes,
+      activity_preferences: twin.activity_preferences,
+      mood_stability: twin.mood_stability,
+      social_energy: twin.social_energy,
+      shared_values_tags: twin.shared_values_tags,
+      last_updated: twin.last_updated,
+      exported_at: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `neurokin-twin-${twin.student_id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setToastMessage("Twin data exported successfully!");
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await deleteAccount(DEMO_STUDENT_ID);
+      setShowDeleteConfirm(false);
+      setToastMessage("Account deleted. All data has been removed.");
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+        window.location.href = "/";
+      }, 2000);
+    } catch (err) {
+      console.error("Delete failed:", err);
+      setToastMessage("Failed to delete account. Please try again.");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleConsentToggle = async () => {
+    const newConsent = !consentGranted;
+    try {
+      await submitConsent(DEMO_STUDENT_ID, newConsent);
+      setConsentGranted(newConsent);
+      setToastMessage(newConsent ? "Data processing re-enabled." : "Data processing paused.");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (err) {
+      console.error("Consent update failed:", err);
+    }
+  };
 
   if (loading) return <LoadingSpinner color="text-purple-500" />;
 
@@ -189,18 +261,104 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExportData}>
               <Download className="w-4 h-4" /> Export My Data
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => setShowPrivacy(!showPrivacy)}>
               <Settings className="w-4 h-4" /> Privacy Settings
             </Button>
-            <Button variant="danger" size="sm">
+            <Button variant="danger" size="sm" onClick={() => setShowDeleteConfirm(true)}>
               <Trash2 className="w-4 h-4" /> Delete My Twin
             </Button>
           </div>
+
+          {/* Privacy settings panel */}
+          {showPrivacy && (
+            <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-[var(--color-border)] animate-fade-in-up">
+              <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                <Settings className="w-4 h-4 text-[var(--color-text-muted)]" />
+                Privacy Controls
+              </h4>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Allow data processing</p>
+                    <p className="text-xs text-[var(--color-text-muted)]">
+                      When off, your twin won&apos;t update and you won&apos;t appear in matches.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleConsentToggle}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      consentGranted ? "bg-emerald-500" : "bg-slate-300"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        consentGranted ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+                <div className="flex items-start gap-2 text-xs text-[var(--color-text-muted)]">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                  <span>Journals are encrypted at rest using Fernet symmetric encryption. Raw text is never shared with other students.</span>
+                </div>
+                <div className="flex items-start gap-2 text-xs text-[var(--color-text-muted)]">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                  <span>Matching uses only aggregated emotional patterns and theme tags — never raw content.</span>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Delete confirmation modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 animate-fade-in-up">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">Delete your account?</h3>
+                <p className="text-sm text-[var(--color-text-muted)]">This action cannot be undone.</p>
+              </div>
+            </div>
+            <p className="text-sm text-[var(--color-text-muted)] mb-6">
+              This will permanently delete all your data: journal entries, mood check-ins,
+              your Emotional Twin, matches, and any reports. You will be redirected to the home page.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                <X className="w-4 h-4" /> Cancel
+              </Button>
+              <Button
+                variant="danger"
+                className="flex-1"
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+              >
+                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                {deleting ? "Deleting..." : "Delete Everything"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast notification */}
+      <Toast
+        message={toastMessage}
+        visible={showToast}
+        onDismiss={() => setShowToast(false)}
+      />
     </div>
   );
 }

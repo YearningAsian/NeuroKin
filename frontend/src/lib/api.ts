@@ -101,3 +101,65 @@ export async function reportUser(studentId: string, reportedId: string, reason: 
   });
   return parseResponse(res);
 }
+
+// --- Additional API functions ---
+
+export interface JournalEntryPreview {
+  text: string;
+  mood_label: string | null;
+  tags: string[];
+  created_at: string;
+}
+
+export interface MoodHistoryEntry {
+  mood_label: string;
+  energy_level: number;
+  stress_level: number;
+  social_battery: number;
+  created_at: string;
+}
+
+export async function getJournalEntries(studentId: string, limit = 20): Promise<JournalEntryPreview[]> {
+  const res = await fetch(`${API_BASE}/journal?student_id=${studentId}&limit=${limit}`);
+  return parseResponse(res);
+}
+
+export async function getMoodHistory(studentId: string, limit = 7): Promise<MoodHistoryEntry[]> {
+  const res = await fetch(`${API_BASE}/mood/history?student_id=${studentId}&limit=${limit}`);
+  return parseResponse(res);
+}
+
+export async function deleteAccount(studentId: string): Promise<{ status: string; deleted: string }> {
+  const res = await fetch(`${API_BASE}/account?student_id=${studentId}`, {
+    method: "DELETE",
+  });
+  return parseResponse(res);
+}
+
+export async function submitConsent(studentId: string, consented: boolean): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/consent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ student_id: studentId, consented }),
+  });
+  return parseResponse(res);
+}
+
+export async function submitActivity(
+  studentId: string,
+  activityType: string,
+  description?: string,
+  durationMins?: number,
+): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/activity`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      student_id: studentId,
+      activity_type: activityType,
+      description,
+      duration_mins: durationMins,
+    }),
+  });
+  return parseResponse(res);
+}
