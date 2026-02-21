@@ -36,6 +36,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
 
+try:
+    from cryptography.fernet import Fernet
+
+    _HAS_CRYPTO = True
+except ImportError:  # graceful fallback for dev environments
+    _HAS_CRYPTO = False
+
+try:
+    from langchain_core.runnables import RunnableLambda
+
+    _HAS_LANGCHAIN = True
+except ImportError:
+    _HAS_LANGCHAIN = False
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -47,6 +61,27 @@ logging.getLogger("snowflake.connector").setLevel(logging.WARNING)
 
 DEMO_MODE = os.environ.get("DEMO_MODE", "1") == "1"
 ENABLE_CORTEX_EXPLANATIONS = os.environ.get("ENABLE_CORTEX_EXPLANATIONS", "0") == "1"
+
+# Fernet symmetric encryption for journal text at rest
+_ENCRYPTION_KEY = os.environ.get("ENCRYPTION_KEY", "")
+_fernet = Fernet(_ENCRYPTION_KEY.encode()) if _HAS_CRYPTO and _ENCRYPTION_KEY else None
+
+
+def _encrypt(text: str) -> str:
+    """Encrypt text with Fernet if a key is configured, else return plain."""
+    if _fernet:
+        return _fernet.encrypt(text.encode()).decode()
+    return text
+
+
+def _decrypt(ciphertext: str) -> str:
+    """Decrypt Fernet ciphertext if a key is configured, else return as-is."""
+    if _fernet:
+        try:
+            return _fernet.decrypt(ciphertext.encode()).decode()
+        except Exception:
+            return ciphertext  # already plain or different key
+    return ciphertext
 
 if not DEMO_MODE:
     import snowflake.connector  # only import when actually needed
@@ -100,6 +135,8 @@ _demo_store: dict[str, dict] = {
     "safety_reports": [],
     "onboarding_responses": [],
     "notifications": [],
+    "activities": [],
+    "consents": {},
 }
 
 # SQL constants
@@ -289,6 +326,20 @@ class ReportPayload(BaseModel):
     student_id: str
     reported_id: str
     reason: str = Field(..., min_length=1, max_length=1000)
+
+
+class ActivityPayload(BaseModel):
+    """Payload for POST /activity."""
+    student_id: str
+    activity_type: str = Field(..., min_length=1, max_length=64)
+    description: Optional[str] = Field(None, max_length=500)
+    duration_mins: Optional[int] = Field(None, ge=1)
+
+
+class ConsentPayload(BaseModel):
+    """Payload for POST /consent."""
+    student_id: str
+    consented: bool = True
 
 
 # ---------------------------------------------------------------------------
@@ -811,6 +862,34 @@ def _generate_explanation(me: TwinSnapshot, peer: TwinSnapshot, score: float, sh
     return ExplanationChain.run(me, peer, score, shared)
 
 
+# ---------------------------------------------------------------------------
+# LangChain Runnable Wrappers
+# ---------------------------------------------------------------------------
+# Expose each chain as a proper langchain-core Runnable so it can participate
+# in LangChain tracing, callbacks, and RunnableSequence composition.
+
+if _HAS_LANGCHAIN:
+    twin_builder_runnable = RunnableLambda(
+        lambda inputs: TwinBuilderChain.run(**inputs),
+    ).with_config({"run_name": "TwinBuilderChain"})
+
+    match_retrieval_runnable = RunnableLambda(
+        lambda inputs: MatchRetrievalChain.run(**inputs),
+    ).with_config({"run_name": "MatchRetrievalChain"})
+
+    explanation_runnable = RunnableLambda(
+        lambda inputs: ExplanationChain.run(**inputs),
+    ).with_config({"run_name": "ExplanationChain"})
+
+    # Full recommendation pipeline as a single Runnable
+    recommendation_pipeline = match_retrieval_runnable
+else:
+    twin_builder_runnable = None
+    match_retrieval_runnable = None
+    explanation_runnable = None
+    recommendation_pipeline = None
+
+
 def _anonymize(student_id: str) -> str:
     h = hashlib.sha256(student_id.encode()).hexdigest()[:6]
     return f"Student-{h.upper()}"
@@ -883,6 +962,15 @@ CREATE TABLE IF NOT EXISTS mood_checkins (
     stress_level   INT,
     social_battery INT,
     notes          VARCHAR(1000),
+    created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+
+CREATE TABLE IF NOT EXISTS activities (
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    student_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    activity_type  VARCHAR(64)  NOT NULL,
+    description    VARCHAR(500),
+    duration_mins  INT,
     created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
@@ -1112,7 +1200,7 @@ async def post_journal(entry: JournalEntry):
             """,
             (
                 entry.student_id,
-                entry.text,
+                _encrypt(entry.text),
                 entry.mood_label.value if entry.mood_label else None,
                 json.dumps(entry.tags),
                 json.dumps(embedding),
@@ -1266,6 +1354,86 @@ async def post_report(payload: ReportPayload):
             (payload.student_id, payload.reported_id, payload.reason),
         )
     return {"status": "ok"}
+
+
+@app.post("/activity", tags=["Ingestion"])
+async def post_activity(payload: ActivityPayload):
+    """Log a student activity (e.g. 'yoga', 'coding session')."""
+    record = {
+        "student_id": payload.student_id,
+        "activity_type": payload.activity_type,
+        "description": payload.description,
+        "duration_mins": payload.duration_mins,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if DEMO_MODE:
+        _demo_store["activities"].append(record)
+    else:
+        _ensure_student_exists(payload.student_id)
+        _execute(
+            """
+            INSERT INTO activities (student_id, activity_type, description, duration_mins)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (payload.student_id, payload.activity_type, payload.description, payload.duration_mins),
+        )
+    return {"status": "ok"}
+
+
+@app.post("/consent", tags=["Privacy"])
+async def post_consent(payload: ConsentPayload):
+    """Record a student's consent to data processing (required before first use)."""
+    if DEMO_MODE:
+        _demo_store["consents"][payload.student_id] = {
+            "consented": payload.consented,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    else:
+        _ensure_student_exists(payload.student_id)
+        _execute(
+            """
+            UPDATE students SET onboarded = %s, updated_at = CURRENT_TIMESTAMP()
+            WHERE student_id = %s
+            """,
+            (payload.consented, payload.student_id),
+        )
+    return {"status": "ok", "consented": payload.consented}
+
+
+@app.delete("/account", tags=["Privacy"])
+async def delete_account(student_id: str = Query(...)):
+    """
+    Opt-out: permanently delete all data for a student.
+    Removes journal entries, mood check-ins, twin snapshot, matches,
+    blocks, reports, activities, onboarding responses, and notifications.
+    """
+    if DEMO_MODE:
+        _demo_store["twin_snapshots"].pop(student_id, None)
+        _demo_store["consents"].pop(student_id, None)
+        for key in ["journal_entries", "mood_checkins", "matches", "blocks",
+                     "safety_reports", "onboarding_responses", "notifications", "activities"]:
+            _demo_store[key] = [r for r in _demo_store[key] if r.get("student_id") != student_id
+                                and r.get("student_a") != student_id and r.get("blocker_id") != student_id
+                                and r.get("reporter_id") != student_id]
+        _demo_store["students"].pop(student_id, None)
+    else:
+        # Order matters: delete referencing rows first, then the student
+        for stmt in [
+            "DELETE FROM notifications WHERE student_id = %s",
+            "DELETE FROM onboarding_responses WHERE student_id = %s",
+            "DELETE FROM activities WHERE student_id = %s",
+            "DELETE FROM blocks WHERE blocker_id = %s OR blocked_id = %s",
+            "DELETE FROM safety_reports WHERE reporter_id = %s OR reported_id = %s",
+            "DELETE FROM matches WHERE student_a = %s OR student_b = %s",
+            "DELETE FROM mood_checkins WHERE student_id = %s",
+            "DELETE FROM journal_entries WHERE student_id = %s",
+            "DELETE FROM twin_snapshots WHERE student_id = %s",
+        ]:
+            # Some statements reference student_id twice
+            param_count = stmt.count("%s")
+            _execute(stmt, tuple([student_id] * param_count))
+        _execute("DELETE FROM students WHERE student_id = %s", (student_id,))
+    return {"status": "ok", "deleted": student_id}
 
 
 # ---------------------------------------------------------------------------

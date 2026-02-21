@@ -11,6 +11,7 @@
 ```
 students ─┬── journal_entries      (1 : N)
            ├── mood_checkins        (1 : N)
+           ├── activities           (1 : N)
            ├── twin_snapshots       (1 : 1)
            ├── onboarding_responses (1 : 1)
            ├── matches              (M : N  via student_a / student_b)
@@ -71,7 +72,22 @@ Quick mood snapshots with 1–10 scales.
 
 ---
 
-### 4. `twin_snapshots`
+### 4. `activities`
+
+Logged student activities (exercise, hobbies, study sessions, etc.). Feeds into `activity_preferences` in the twin.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | VARCHAR(64) | UUID | **PK** |
+| `student_id` | VARCHAR(64) | — | **FK → students** |
+| `activity_type` | VARCHAR(64) | — | Category: yoga, coding, reading, etc. |
+| `description` | VARCHAR(500) | NULL | Optional free-text description |
+| `duration_mins` | INT | NULL | Duration in minutes |
+| `created_at` | TIMESTAMP_NTZ | NOW | |
+
+---
+
+### 5. `twin_snapshots`
 
 The Emotional Digital Twin — one living row per student, updated on every ingestion.
 
@@ -92,7 +108,7 @@ The Emotional Digital Twin — one living row per student, updated on every inge
 
 ---
 
-### 5. `matches`
+### 6. `matches`
 
 Recommendation results with student feedback.
 
@@ -109,7 +125,7 @@ Recommendation results with student feedback.
 
 ---
 
-### 6. `blocks`
+### 7. `blocks`
 
 Peer-level blocks. Blocked students are excluded from recommendations.
 
@@ -122,7 +138,7 @@ Peer-level blocks. Blocked students are excluded from recommendations.
 
 ---
 
-### 7. `safety_reports`
+### 8. `safety_reports`
 
 Moderation reports filed by students.
 
@@ -140,7 +156,7 @@ Moderation reports filed by students.
 
 ---
 
-### 8. `onboarding_responses`
+### 9. `onboarding_responses`
 
 Captures the full onboarding wizard submission so it can be replayed or audited.
 
@@ -158,7 +174,7 @@ Captures the full onboarding wizard submission so it can be replayed or audited.
 
 ---
 
-### 9. `notifications`
+### 10. `notifications`
 
 In-app notification feed.
 

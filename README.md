@@ -108,11 +108,14 @@ Set `NEXT_PUBLIC_API_URL=http://localhost:8000` in the frontend `.env.local` to 
 |--------|------|-------------|
 | POST | `/journal` | Submit a journal entry → triggers TwinBuilderChain |
 | POST | `/mood` | Submit a mood check-in → updates twin |
+| POST | `/activity` | Log a student activity |
 | GET | `/twin?student_id=` | Retrieve the Emotional Digital Twin |
 | GET | `/recommendations?student_id=` | Get peer matches ≥ 50% |
 | POST | `/feedback` | Accept / skip a recommendation |
 | POST | `/block` | Block a peer |
 | POST | `/report` | Report a peer |
+| POST | `/consent` | Record data-processing consent |
+| DELETE | `/account?student_id=` | Opt-out: delete all student data |
 | GET | `/health` | Health check |
 
 ---
@@ -163,11 +166,23 @@ No routing logic changes needed — FastAPI auto-serializes from the model.
 
 ## Safety & Privacy
 
-- All journal text is encrypted at rest
+- Journal text is **Fernet-encrypted** at rest (set `ENCRYPTION_KEY` in `.env`)
 - Raw journals are **never** shared between students
 - Block & report mechanisms with school-level moderation
+- Explicit consent endpoint (`POST /consent`) required before data processing
+- Full data deletion via `DELETE /account` (opt-out)
 - FERPA / COPPA compliance design
-- Opt-out and data deletion available
+
+---
+
+## LangChain Integration
+
+All three chains (`TwinBuilderChain`, `MatchRetrievalChain`, `ExplanationChain`) are wrapped as **langchain-core `Runnable`** objects, making them compatible with:
+- LangChain tracing & callbacks (LangSmith)
+- `RunnableSequence` composition
+- Async invocation and batching
+
+When `langchain-core` is installed, the runnables are available as module-level objects (`twin_builder_runnable`, `match_retrieval_runnable`, `recommendation_pipeline`).
 
 ---
 

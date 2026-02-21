@@ -63,6 +63,16 @@ CREATE TABLE IF NOT EXISTS mood_checkins (
     created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
+-- ── activities ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS activities (
+    id             VARCHAR(64)   DEFAULT UUID_STRING() PRIMARY KEY,
+    student_id     VARCHAR(64)   NOT NULL REFERENCES students(student_id),
+    activity_type  VARCHAR(64)   NOT NULL,
+    description    VARCHAR(500),
+    duration_mins  INT,
+    created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+
 -- ── twin_snapshots ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS twin_snapshots (
     student_id            VARCHAR(64)  PRIMARY KEY REFERENCES students(student_id),

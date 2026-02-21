@@ -7,3 +7,4 @@ snowflake-connector-python>=3.6
 langchain-core>=0.3
 # langchain-snowflake — install from Snowflake's channel when available
 # langchain-snowflake>=0.1
+cryptography>=42.0
