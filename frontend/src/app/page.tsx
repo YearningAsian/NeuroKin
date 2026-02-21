@@ -23,7 +23,15 @@ import {
   useInView,
   AnimatePresence,
 } from "framer-motion";
-import { useRef, useState, useEffect, useCallback } from "react";
+import {
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+  type FormEvent,
+  type RefObject,
+  type ReactNode,
+} from "react";
 
 /* ─────────────────────── DATA ─────────────────────── */
 
@@ -176,7 +184,7 @@ function FadeInWhenVisible({
   direction = "up",
   className = "",
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   delay?: number;
   direction?: "up" | "down" | "left" | "right";
   className?: string;
@@ -314,10 +322,12 @@ function ConnectorLines({ radius }: { radius: number }) {
     >
       {twinFactors.map((f, i) => {
         const rad = (f.angle * Math.PI) / 180;
-        const outerX = 350 + Math.cos(rad) * (radius - 30);
-        const outerY = 350 + Math.sin(rad) * (radius - 30);
-        const innerX = 350 + Math.cos(rad) * 75;
-        const innerY = 350 + Math.sin(rad) * 75;
+        const innerRadius = 110;
+        const outerRadius = Math.max(radius - 40, innerRadius + 35);
+        const outerX = 350 + Math.cos(rad) * outerRadius;
+        const outerY = 350 + Math.sin(rad) * outerRadius;
+        const innerX = 350 + Math.cos(rad) * innerRadius;
+        const innerY = 350 + Math.sin(rad) * innerRadius;
 
         return (
           <motion.line
@@ -438,7 +448,7 @@ function Carousel() {
 
 /* ─────────────── PARALLAX HOOK ─────────────── */
 function useParallax(
-  ref: React.RefObject<HTMLElement | null>,
+  ref: RefObject<HTMLElement | null>,
   distance: number
 ) {
   const { scrollYProgress } = useScroll({
@@ -453,14 +463,43 @@ function useParallax(
 export default function LandingPage() {
   const heroRef = useRef<HTMLElement>(null);
   const heroY = useParallax(heroRef, 50);
+  const entryTimeoutRef = useRef<number | null>(null);
+  const [journalEntry, setJournalEntry] = useState("");
+  const [journalStatus, setJournalStatus] = useState<string | null>(null);
+
+  const handleJournalSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = journalEntry.trim();
+    if (!trimmed) {
+      setJournalStatus("Share a quick thought before logging.");
+      return;
+    }
+    setJournalStatus("Entry logged. Your twin is listening.");
+    setJournalEntry("");
+    console.log("Journal entry:", trimmed);
+    if (entryTimeoutRef.current) {
+      clearTimeout(entryTimeoutRef.current);
+    }
+    entryTimeoutRef.current = window.setTimeout(() => {
+      setJournalStatus(null);
+    }, 3200);
+  };
 
   /* Responsive radius for the thought cloud orbit */
-  const [cloudRadius, setCloudRadius] = useState(210);
+  const [cloudRadius, setCloudRadius] = useState(230);
   useEffect(() => {
-    const update = () => setCloudRadius(window.innerWidth < 768 ? 140 : 210);
+    const update = () => setCloudRadius(window.innerWidth < 768 ? 150 : 230);
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (entryTimeoutRef.current) {
+        clearTimeout(entryTimeoutRef.current);
+      }
+    };
   }, []);
 
   return (
@@ -647,6 +686,49 @@ export default function LandingPage() {
               </Button>
             </a>
           </motion.div>
+          <motion.form
+            onSubmit={handleJournalSubmit}
+            className="max-w-4xl mx-auto mt-10"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 2.2, duration: 0.6 }}
+          >
+            <div className="flex flex-col gap-4 md:flex-row md:items-start bg-white/90 border border-slate-200/80 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-sm">
+              <div className="flex-1">
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">
+                  Sync a thought
+                </p>
+                <h3 className="text-xl md:text-2xl font-bold text-slate-800 mb-3">
+                  Ask your twin a question or log a quick entry.
+                </h3>
+                <textarea
+                  value={journalEntry}
+                  onChange={(event) => setJournalEntry(event.target.value)}
+                  placeholder="What do I need today? Ask your digital twin anything."
+                  className="w-full min-h-[120px] resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent shadow-sm"
+                  rows={3}
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Entries stay private and help the twin reflect who you are.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 md:w-36 md:items-end">
+                <Button type="submit" size="md" className="w-full">
+                  Log entry
+                </Button>
+                <Link href="/journal">
+                  <Button variant="outline" size="md" className="w-full">
+                    Open journal
+                  </Button>
+                </Link>
+                {journalStatus && (
+                  <p className="text-xs text-emerald-600 font-semibold mt-1 text-center md:text-right">
+                    {journalStatus}
+                  </p>
+                )}
+              </div>
+            </div>
+          </motion.form>
         </div>
       </section>
 
