@@ -28,9 +28,11 @@ import {
   useState,
   useEffect,
   useCallback,
+  type ComponentType,
   type FormEvent,
   type RefObject,
   type ReactNode,
+  type SVGProps,
 } from "react";
 
 /* ─────────────────────── DATA ─────────────────────── */
@@ -38,7 +40,17 @@ import {
 const DICEBEAR_BASE = "https://api.dicebear.com/9.x/thumbs/svg";
 const heroSeed = "neurotwin-hero";
 
-const twinFactors = [
+type TwinFactor = {
+  label: string;
+  description: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  color: string;
+  angle: number;
+  bubbleShift?: { x?: number; y?: number };
+  tailShift?: { dx?: number; dy?: number };
+};
+
+const twinFactors: TwinFactor[] = [
   {
     label: "Emotional Patterns",
     description: "How you feel day-to-day",
@@ -73,6 +85,8 @@ const twinFactors = [
     icon: Users,
     color: "#10b981",
     angle: 198,
+    bubbleShift: { x: -35 },
+    tailShift: { dx: 12 },
   },
 ];
 
@@ -184,7 +198,7 @@ function FadeInWhenVisible({
   direction = "up",
   className = "",
 }: {
-  children: ReactNode;
+  children: React.ReactNode;
   delay?: number;
   direction?: "up" | "down" | "left" | "right";
   className?: string;
@@ -222,7 +236,7 @@ function ThoughtCloud({
   index,
   radius,
 }: {
-  factor: (typeof twinFactors)[0];
+  factor: TwinFactor;
   index: number;
   radius: number;
 }) {
@@ -230,16 +244,20 @@ function ThoughtCloud({
   const rad = (factor.angle * Math.PI) / 180;
   const cx = Math.cos(rad) * radius;
   const cy = Math.sin(rad) * radius;
+  const shiftX = factor.bubbleShift?.x ?? 0;
+  const shiftY = factor.bubbleShift?.y ?? 0;
 
   // Determine which side the cloud is relative to center for tail placement
   const isRight = cx > 0;
+  const tailDx = factor.tailShift?.dx ?? 0;
+  const tailDy = factor.tailShift?.dy ?? 0;
 
   return (
     <motion.div
       className="absolute z-20 pointer-events-auto"
       style={{
-        left: `calc(50% + ${cx}px)`,
-        top: `calc(50% + ${cy}px)`,
+        left: `calc(50% + ${cx + shiftX}px)`,
+        top: `calc(50% + ${cy + shiftY}px)`,
         transform: "translate(-50%, -50%)",
       }}
       initial={{ opacity: 0, scale: 0 }}
@@ -272,10 +290,10 @@ function ThoughtCloud({
           className="absolute w-3.5 h-3.5 rounded-full bg-white"
           style={{
             border: `1.5px solid ${factor.color}20`,
-            bottom: cy > 0 ? "auto" : -10,
-            top: cy > 0 ? -10 : "auto",
-            left: isRight ? 24 : "auto",
-            right: !isRight ? 24 : "auto",
+            bottom: cy > 0 ? "auto" : -10 + tailDy,
+            top: cy > 0 ? -10 + tailDy : "auto",
+            left: isRight ? 24 + tailDx : "auto",
+            right: !isRight ? 24 + tailDx : "auto",
             boxShadow: `0 2px 6px ${factor.color}12`,
           }}
         />
@@ -283,10 +301,10 @@ function ThoughtCloud({
           className="absolute w-2 h-2 rounded-full bg-white"
           style={{
             border: `1.5px solid ${factor.color}20`,
-            bottom: cy > 0 ? "auto" : -18,
-            top: cy > 0 ? -18 : "auto",
-            left: isRight ? 18 : "auto",
-            right: !isRight ? 18 : "auto",
+            bottom: cy > 0 ? "auto" : -18 + tailDy,
+            top: cy > 0 ? -18 + tailDy : "auto",
+            left: isRight ? 18 + tailDx : "auto",
+            right: !isRight ? 18 + tailDx : "auto",
             boxShadow: `0 1px 4px ${factor.color}10`,
           }}
         />
@@ -448,7 +466,7 @@ function Carousel() {
 
 /* ─────────────── PARALLAX HOOK ─────────────── */
 function useParallax(
-  ref: RefObject<HTMLElement | null>,
+  ref: React.RefObject<HTMLElement | null>,
   distance: number
 ) {
   const { scrollYProgress } = useScroll({
@@ -463,43 +481,14 @@ function useParallax(
 export default function LandingPage() {
   const heroRef = useRef<HTMLElement>(null);
   const heroY = useParallax(heroRef, 50);
-  const entryTimeoutRef = useRef<number | null>(null);
-  const [journalEntry, setJournalEntry] = useState("");
-  const [journalStatus, setJournalStatus] = useState<string | null>(null);
-
-  const handleJournalSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const trimmed = journalEntry.trim();
-    if (!trimmed) {
-      setJournalStatus("Share a quick thought before logging.");
-      return;
-    }
-    setJournalStatus("Entry logged. Your twin is listening.");
-    setJournalEntry("");
-    console.log("Journal entry:", trimmed);
-    if (entryTimeoutRef.current) {
-      clearTimeout(entryTimeoutRef.current);
-    }
-    entryTimeoutRef.current = window.setTimeout(() => {
-      setJournalStatus(null);
-    }, 3200);
-  };
 
   /* Responsive radius for the thought cloud orbit */
-  const [cloudRadius, setCloudRadius] = useState(230);
+  const [cloudRadius, setCloudRadius] = useState(210);
   useEffect(() => {
-    const update = () => setCloudRadius(window.innerWidth < 768 ? 150 : 230);
+    const update = () => setCloudRadius(window.innerWidth < 768 ? 140 : 210);
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (entryTimeoutRef.current) {
-        clearTimeout(entryTimeoutRef.current);
-      }
-    };
   }, []);
 
   return (
@@ -686,49 +675,6 @@ export default function LandingPage() {
               </Button>
             </a>
           </motion.div>
-          <motion.form
-            onSubmit={handleJournalSubmit}
-            className="max-w-4xl mx-auto mt-10"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 2.2, duration: 0.6 }}
-          >
-            <div className="flex flex-col gap-4 md:flex-row md:items-start bg-white/90 border border-slate-200/80 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-sm">
-              <div className="flex-1">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">
-                  Sync a thought
-                </p>
-                <h3 className="text-xl md:text-2xl font-bold text-slate-800 mb-3">
-                  Ask your twin a question or log a quick entry.
-                </h3>
-                <textarea
-                  value={journalEntry}
-                  onChange={(event) => setJournalEntry(event.target.value)}
-                  placeholder="What do I need today? Ask your digital twin anything."
-                  className="w-full min-h-[120px] resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent shadow-sm"
-                  rows={3}
-                />
-                <p className="text-xs text-slate-400 mt-1">
-                  Entries stay private and help the twin reflect who you are.
-                </p>
-              </div>
-              <div className="flex flex-col gap-2 md:w-36 md:items-end">
-                <Button type="submit" size="md" className="w-full">
-                  Log entry
-                </Button>
-                <Link href="/journal">
-                  <Button variant="outline" size="md" className="w-full">
-                    Open journal
-                  </Button>
-                </Link>
-                {journalStatus && (
-                  <p className="text-xs text-emerald-600 font-semibold mt-1 text-center md:text-right">
-                    {journalStatus}
-                  </p>
-                )}
-              </div>
-            </div>
-          </motion.form>
         </div>
       </section>
 
