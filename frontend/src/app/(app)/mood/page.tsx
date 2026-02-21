@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { SmilePlus, Send, Sparkles, Loader2 } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Toast } from "@/components/ui/Toast";
+import { SmilePlus, Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { submitMood } from "@/lib/api";
 import { DEMO_STUDENT_ID } from "@/lib/user";
@@ -58,15 +60,12 @@ export default function MoodPage() {
 
   return (
     <div className="space-y-8">
-      <div className="animate-fade-in-up">
-        <h1 className="text-2xl md:text-3xl font-extrabold flex items-center gap-3">
-          <SmilePlus className="w-8 h-8 text-emerald-500" />
-          Mood Check-in
-        </h1>
-        <p className="text-[var(--color-text-muted)] mt-1">
-          How are you feeling? This updates your Emotional Twin in real time.
-        </p>
-      </div>
+      <PageHeader
+        icon={SmilePlus}
+        iconColor="text-emerald-500"
+        title="Mood Check-in"
+        description="How are you feeling? This updates your Emotional Twin in real time."
+      />
 
       {/* Mood selection */}
       <Card className="animate-fade-in-up">
@@ -183,12 +182,11 @@ export default function MoodPage() {
         </Button>
       </div>
 
-      {submitted && (
-        <div className="fixed bottom-6 right-6 bg-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in-up z-50">
-          <Sparkles className="w-5 h-5" />
-          Mood recorded! Your Twin has been updated.
-        </div>
-      )}
+      <Toast
+        message="Mood recorded! Your Twin has been updated."
+        visible={submitted}
+        onDismiss={() => setSubmitted(false)}
+      />
     </div>
   );
 }

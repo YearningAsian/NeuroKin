@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { TagList } from "@/components/ui/TagList";
 import {
   Brain,
   TrendingUp,
@@ -14,10 +17,10 @@ import {
   Settings,
   Download,
   Trash2,
-  Loader2,
 } from "lucide-react";
-import { getTwin, type TwinSnapshot } from "@/lib/api";
+import { getTwin } from "@/lib/api";
 import { DEMO_STUDENT_ID } from "@/lib/user";
+import { useFetch } from "@/hooks/useFetch";
 
 const emotionColors: Record<string, string> = {
   joy: "bg-amber-400",
@@ -36,52 +39,28 @@ const emotionColors: Record<string, string> = {
 };
 
 export default function ProfilePage() {
-  const [twin, setTwin] = useState<TwinSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: twin, loading } = useFetch(() => getTwin(DEMO_STUDENT_ID));
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const t = await getTwin(DEMO_STUDENT_ID);
-        setTwin(t);
-      } catch (err) {
-        console.error("Failed to load twin:", err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
-      </div>
-    );
-  }
+  if (loading) return <LoadingSpinner color="text-purple-500" />;
 
   if (!twin) {
     return (
-      <div className="text-center py-16">
-        <Brain className="w-12 h-12 text-[var(--color-text-muted)] mx-auto mb-4" />
-        <h2 className="text-xl font-bold mb-2">No Twin Yet</h2>
-        <p className="text-[var(--color-text-muted)]">Submit a journal entry or mood check-in to build your Emotional Twin.</p>
-      </div>
+      <EmptyState
+        icon={Brain}
+        title="No Twin Yet"
+        description="Submit a journal entry or mood check-in to build your Emotional Twin."
+      />
     );
   }
 
   return (
     <div className="space-y-8">
-      <div className="animate-fade-in-up">
-        <h1 className="text-2xl md:text-3xl font-extrabold flex items-center gap-3">
-          <Brain className="w-8 h-8 text-purple-500" />
-          Your Emotional Twin
-        </h1>
-        <p className="text-[var(--color-text-muted)] mt-1">
-          A dynamic, AI-built representation of your emotional landscape. Updated{" "}
-          <span className="font-medium">{new Date(twin.last_updated).toLocaleDateString()}</span>.
-        </p>
-      </div>
+      <PageHeader
+        icon={Brain}
+        iconColor="text-purple-500"
+        title="Your Emotional Twin"
+        description={`A dynamic, AI-built representation of your emotional landscape. Updated ${new Date(twin.last_updated).toLocaleDateString()}.`}
+      />
 
       {/* Twin overview card */}
       <Card className="bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200 animate-fade-in-up">
@@ -164,16 +143,10 @@ export default function ProfilePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {twin.top_themes.map((t) => (
-                  <span
-                    key={t}
-                    className="text-sm px-4 py-2 rounded-full bg-[var(--color-primary-light)] text-amber-800 font-medium"
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
+              <TagList
+                tags={twin.top_themes}
+                tagClassName="bg-[var(--color-primary-light)] text-amber-800 text-sm px-4 py-2"
+              />
             </CardContent>
           </Card>
 
@@ -182,16 +155,10 @@ export default function ProfilePage() {
               <CardTitle>Activity Preferences</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {twin.activity_preferences.map((a) => (
-                  <span
-                    key={a}
-                    className="text-sm px-4 py-2 rounded-full bg-blue-50 text-blue-700 font-medium border border-blue-200"
-                  >
-                    {a}
-                  </span>
-                ))}
-              </div>
+              <TagList
+                tags={twin.activity_preferences}
+                tagClassName="bg-blue-50 text-blue-700 border border-blue-200 text-sm px-4 py-2"
+              />
             </CardContent>
           </Card>
 
@@ -200,16 +167,10 @@ export default function ProfilePage() {
               <CardTitle>Core Values</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {(twin.shared_values_tags ?? []).map((v) => (
-                  <span
-                    key={v}
-                    className="text-sm px-4 py-2 rounded-full bg-emerald-50 text-emerald-700 font-medium border border-emerald-200"
-                  >
-                    {v}
-                  </span>
-                ))}
-              </div>
+              <TagList
+                tags={twin.shared_values_tags ?? []}
+                tagClassName="bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm px-4 py-2"
+              />
             </CardContent>
           </Card>
         </div>
