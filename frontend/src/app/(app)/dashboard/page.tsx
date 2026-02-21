@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { ProgressBar } from "@/components/ui/ProgressBar";
+import { TagList } from "@/components/ui/TagList";
 import Link from "next/link";
 import {
   BookHeart,
@@ -12,10 +14,10 @@ import {
   Brain,
   Sparkles,
   ArrowRight,
-  Loader2,
 } from "lucide-react";
-import { getTwin, getRecommendations, type TwinSnapshot, type PeerRecommendation } from "@/lib/api";
+import { getTwin, getRecommendations } from "@/lib/api";
 import { DEMO_STUDENT_ID } from "@/lib/user";
+import { useFetch } from "@/hooks/useFetch";
 
 const moodHistory = [
   { day: "Mon", label: "😊", value: 80 },
@@ -28,34 +30,12 @@ const moodHistory = [
 ];
 
 export default function DashboardPage() {
-  const [twin, setTwin] = useState<TwinSnapshot | null>(null);
-  const [recentMatches, setRecentMatches] = useState<PeerRecommendation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: twin, loading: twinLoading } = useFetch(() => getTwin(DEMO_STUDENT_ID));
+  const { data: recommendations, loading: recommendationsLoading } = useFetch(() => getRecommendations(DEMO_STUDENT_ID));
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [t, r] = await Promise.all([
-          getTwin(DEMO_STUDENT_ID),
-          getRecommendations(DEMO_STUDENT_ID),
-        ]);
-        setTwin(t);
-        setRecentMatches(r.slice(0, 3));
-      } catch (err) {
-        console.error("Dashboard fetch failed:", err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  const recentMatches = (recommendations ?? []).slice(0, 3);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
-      </div>
-    );
-  }
+  if (twinLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-8">
@@ -117,41 +97,18 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-6">
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-[var(--color-text-muted)]">Mood Stability</span>
-                  <span className="font-semibold">{Math.round((twin?.mood_stability ?? 0) * 100)}%</span>
-                </div>
-                <div className="w-full h-3 rounded-full bg-slate-100">
-                  <div
-                    className="h-3 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all"
-                    style={{ width: `${(twin?.mood_stability ?? 0) * 100}%` }}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-[var(--color-text-muted)]">Social Energy</span>
-                  <span className="font-semibold">{Math.round(twin?.social_energy ?? 0)}%</span>
-                </div>
-                <div className="w-full h-3 rounded-full bg-slate-100">
-                  <div
-                    className="h-3 rounded-full bg-gradient-to-r from-blue-400 to-blue-500 transition-all"
-                    style={{ width: `${twin?.social_energy ?? 0}%` }}
-                  />
-                </div>
-              </div>
+              <ProgressBar
+                label="Mood Stability"
+                value={twin?.mood_stability ?? 0}
+                gradient="bg-gradient-to-r from-emerald-400 to-emerald-500"
+              />
+              <ProgressBar
+                label="Social Energy"
+                value={twin?.social_energy ?? 0}
+                gradient="bg-gradient-to-r from-blue-400 to-blue-500"
+              />
             </div>
-            <div className="mt-6 flex flex-wrap gap-2">
-              {(twin?.top_themes ?? []).map((t) => (
-                <span
-                  key={t}
-                  className="text-xs px-3 py-1.5 rounded-full bg-[var(--color-primary-light)] text-amber-800 font-medium"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
+            <TagList tags={twin?.top_themes ?? []} className="mt-6" />
             <div className="mt-6 flex items-center gap-4 text-sm text-[var(--color-text-muted)]">
               <div className="flex items-center gap-1.5">
                 <BookHeart className="w-4 h-4" /> {twin?.top_themes.length ?? 0} themes
@@ -225,8 +182,13 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {recentMatches.map((match) => (
+          {recommendationsLoading ? (
+            <div className="py-6 flex justify-center">
+              <LoadingSpinner color="text-[var(--color-primary)]" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentMatches.map((match) => (
               <div
                 key={match.peer_id}
                 className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
@@ -254,8 +216,12 @@ export default function DashboardPage() {
                   <div className="text-xs text-[var(--color-text-muted)]">compatible</div>
                 </div>
               </div>
-            ))}
-          </div>
+              ))}
+              {recentMatches.length === 0 && (
+                <div className="text-sm text-[var(--color-text-muted)] py-2">No matches yet.</div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

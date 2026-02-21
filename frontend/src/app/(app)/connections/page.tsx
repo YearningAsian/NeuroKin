@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
+import { useState, memo } from "react";
+import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { TagList } from "@/components/ui/TagList";
 import {
   Users,
   MessageCircle,
@@ -14,11 +17,11 @@ import {
   Sparkles,
   CheckCircle2,
   XCircle,
-  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getRecommendations, submitFeedback, reportUser, type PeerRecommendation } from "@/lib/api";
 import { DEMO_STUDENT_ID } from "@/lib/user";
+import { useFetch } from "@/hooks/useFetch";
 
 const avatarColors = [
   "from-blue-400 to-indigo-500",
@@ -29,13 +32,14 @@ const avatarColors = [
   "from-cyan-400 to-blue-500",
 ];
 
+function scoreColor(score: number): string {
+  if (score >= 80) return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  if (score >= 65) return "bg-blue-100 text-blue-700 border-blue-200";
+  return "bg-amber-100 text-amber-700 border-amber-200";
+}
+
 function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 80
-      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-      : score >= 65
-        ? "bg-blue-100 text-blue-700 border-blue-200"
-        : "bg-amber-100 text-amber-700 border-amber-200";
+  const color = scoreColor(score);
   return (
     <div className={cn("px-3 py-1 rounded-full border text-sm font-bold", color)}>
       {score}%
@@ -43,7 +47,7 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
-function MatchCard({ match, colorIdx }: { match: PeerRecommendation; colorIdx: number }) {
+function MatchCardInner({ match, colorIdx }: { match: PeerRecommendation; colorIdx: number }) {
   const [expanded, setExpanded] = useState(false);
   const [accepted, setAccepted] = useState<boolean | null>(null);
   const avatarColor = avatarColors[colorIdx % avatarColors.length];
@@ -85,16 +89,11 @@ function MatchCard({ match, colorIdx }: { match: PeerRecommendation; colorIdx: n
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {match.shared_themes.map((t) => (
-                <span
-                  key={t}
-                  className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-[var(--color-text-muted)]"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
+            <TagList
+              tags={match.shared_themes}
+              tagClassName="bg-slate-100 text-[var(--color-text-muted)] text-xs px-2 py-0.5"
+              className="mt-1.5"
+            />
           </div>
           <button
             onClick={() => setExpanded(!expanded)}
@@ -177,42 +176,22 @@ function MatchCard({ match, colorIdx }: { match: PeerRecommendation; colorIdx: n
   );
 }
 
+const MatchCard = memo(MatchCardInner);
+
 export default function ConnectionsPage() {
-  const [matches, setMatches] = useState<PeerRecommendation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading } = useFetch(() => getRecommendations(DEMO_STUDENT_ID));
+  const matches = data ?? [];
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await getRecommendations(DEMO_STUDENT_ID);
-        setMatches(data);
-      } catch (err) {
-        console.error("Failed to load recommendations:", err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--color-accent)]" />
-      </div>
-    );
-  }
+  if (loading) return <LoadingSpinner color="text-[var(--color-accent)]" />;
 
   return (
     <div className="space-y-8">
-      <div className="animate-fade-in-up">
-        <h1 className="text-2xl md:text-3xl font-extrabold flex items-center gap-3">
-          <Users className="w-8 h-8 text-[var(--color-accent)]" />
-          Your Connections
-        </h1>
-        <p className="text-[var(--color-text-muted)] mt-1">
-          Peers matched above 50% emotional compatibility. Only shared themes are shown — never raw journals.
-        </p>
-      </div>
+      <PageHeader
+        icon={Users}
+        iconColor="text-[var(--color-accent)]"
+        title="Your Connections"
+        description="Peers matched above 50% emotional compatibility. Only shared themes are shown — never raw journals."
+      />
 
       {/* Safety notice */}
       <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3 animate-fade-in-up">

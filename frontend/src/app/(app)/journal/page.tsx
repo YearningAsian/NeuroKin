@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
+import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { BookHeart, Send, Lock, Sparkles, Clock, Loader2 } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Toast } from "@/components/ui/Toast";
+import { BookHeart, Send, Lock, Clock, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { submitJournal } from "@/lib/api";
 import { DEMO_STUDENT_ID } from "@/lib/user";
@@ -62,15 +64,12 @@ export default function JournalPage() {
 
   return (
     <div className="space-y-8">
-      <div className="animate-fade-in-up">
-        <h1 className="text-2xl md:text-3xl font-extrabold flex items-center gap-3">
-          <BookHeart className="w-8 h-8 text-[var(--color-warm)]" />
-          Journal
-        </h1>
-        <p className="text-[var(--color-text-muted)] mt-1">
-          Write freely. Your entries are encrypted and shape your Emotional Twin.
-        </p>
-      </div>
+      <PageHeader
+        icon={BookHeart}
+        iconColor="text-[var(--color-warm)]"
+        title="Journal"
+        description="Write freely. Your entries are encrypted and shape your Emotional Twin."
+      />
 
       {/* Journal prompts */}
       <div className="animate-fade-in-up">
@@ -131,12 +130,11 @@ export default function JournalPage() {
       </Card>
 
       {/* Submitted toast */}
-      {submitted && (
-        <div className="fixed bottom-6 right-6 bg-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in-up z-50">
-          <Sparkles className="w-5 h-5" />
-          Journal submitted! Your Twin is updating...
-        </div>
-      )}
+      <Toast
+        message="Journal submitted! Your Twin is updating..."
+        visible={submitted}
+        onDismiss={() => setSubmitted(false)}
+      />
 
       {/* Past entries */}
       <div className="animate-fade-in-up">
@@ -145,8 +143,8 @@ export default function JournalPage() {
           Recent Entries
         </h2>
         <div className="space-y-3">
-          {pastEntries.map((entry, i) => (
-            <Card key={i} className="card-hover cursor-pointer">
+          {pastEntries.map((entry) => (
+            <Card key={entry.date} className="card-hover cursor-pointer">
               <CardContent className="flex items-start gap-4 py-4">
                 <div className="text-2xl mt-1">{entry.mood}</div>
                 <div className="flex-1 min-w-0">

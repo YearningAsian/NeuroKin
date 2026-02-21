@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import {
   Brain,
@@ -68,7 +67,6 @@ export default function OnboardingPage() {
   const [selectedValues, setSelectedValues] = useState<string[]>([]);
   const [journalText, setJournalText] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const router = useRouter();
 
   const toggleActivity = (label: string) => {
     setSelectedActivities((prev) =>
