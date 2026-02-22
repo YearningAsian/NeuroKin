@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Card, CardContent } from "@/components/ui/Card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Toast } from "@/components/ui/Toast";
-import { BookHeart, Send, Lock, Clock, Loader2, Mic, MicOff } from "lucide-react";
-import { submitJournal, getJournalEntries, type JournalEntryPreview } from "@/lib/api";
+import { BookHeart, Send, Lock, Clock, Loader2, Mic, MicOff, SmilePlus } from "lucide-react";
+import { submitJournal, submitMood, getJournalEntries, getMoodHistory, type JournalEntryPreview, type MoodHistoryEntry } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useFetch } from "@/hooks/useFetch";
+import { cn } from "@/lib/utils";
 
 const prompts = [
   "What's been on your mind today?",
@@ -30,6 +31,17 @@ const MOOD_EMOJI: Record<string, string> = {
   tired: "😴",
   excited: "🤩",
 };
+
+const moods = [
+  { emoji: "😊", label: "Happy", color: "bg-amber-100 border-amber-300 hover:bg-amber-200" },
+  { emoji: "😌", label: "Calm", color: "bg-emerald-100 border-emerald-300 hover:bg-emerald-200" },
+  { emoji: "😔", label: "Sad", color: "bg-blue-100 border-blue-300 hover:bg-blue-200" },
+  { emoji: "😤", label: "Frustrated", color: "bg-red-100 border-red-300 hover:bg-red-200" },
+  { emoji: "😰", label: "Anxious", color: "bg-purple-100 border-purple-300 hover:bg-purple-200" },
+  { emoji: "🤔", label: "Reflective", color: "bg-indigo-100 border-indigo-300 hover:bg-indigo-200" },
+  { emoji: "😴", label: "Tired", color: "bg-slate-100 border-slate-300 hover:bg-slate-200" },
+  { emoji: "🤩", label: "Excited", color: "bg-pink-100 border-pink-300 hover:bg-pink-200" },
+];
 
 type SpeechRecognitionResultItem = {
   transcript: string;
@@ -69,6 +81,17 @@ export default function JournalPage() {
   const [entriesLimit, setEntriesLimit] = useState(5);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  // Mood check-in state
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [energy, setEnergy] = useState(5);
+  const [stress, setStress] = useState(5);
+  const [social, setSocial] = useState(5);
+  const [moodNotes, setMoodNotes] = useState("");
+  const [moodSubmitted, setMoodSubmitted] = useState(false);
+  const [moodSubmitting, setMoodSubmitting] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+
   const speechSupported =
     typeof window !== "undefined" &&
     !!(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -80,20 +103,63 @@ export default function JournalPage() {
   );
   const { data: entries, loading: entriesLoading } = useFetch(fetcher);
 
+  const moodFetcher = useCallback(
+    () => getMoodHistory(studentId, 7),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [refreshKey, studentId],
+  );
+  const { data: moodHistory } = useFetch(moodFetcher);
+
   const handleSubmit = async () => {
     if (!text.trim() || submitting) return;
     setSubmitting(true);
     try {
-      await submitJournal({ student_id: studentId, text });
+      await submitJournal({
+        student_id: studentId,
+        text,
+        mood_label: selectedMood?.toLowerCase(),
+      });
+      setToastMessage("Journal submitted! Your Twin is updating...");
       setSubmitted(true);
       setTimeout(() => setSubmitted(false), 3000);
       setText("");
-      // Refresh entries list
+      // Refresh entries & mood history
       setRefreshKey((k) => k + 1);
     } catch (err) {
       console.error("Journal submit failed:", err);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleMoodSubmit = async () => {
+    if (!selectedMood || moodSubmitting) return;
+    setMoodSubmitting(true);
+    try {
+      await submitMood({
+        student_id: studentId,
+        mood_label: selectedMood.toLowerCase(),
+        energy_level: energy,
+        stress_level: stress,
+        social_battery: social,
+        notes: moodNotes || undefined,
+      });
+      setToastMessage("Mood recorded! Your Twin has been updated.");
+      setMoodSubmitted(true);
+      setTimeout(() => {
+        setMoodSubmitted(false);
+        setSelectedMood(null);
+        setEnergy(5);
+        setStress(5);
+        setSocial(5);
+        setMoodNotes("");
+      }, 3000);
+      // Refresh data
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      console.error("Mood submit failed:", err);
+    } finally {
+      setMoodSubmitting(false);
     }
   };
 
@@ -131,8 +197,100 @@ export default function JournalPage() {
         icon={BookHeart}
         iconColor="text-[var(--color-warm)]"
         title="Journal"
-        description="Write or speak freely. Your entries are encrypted and shape your Emotional Twin."
+        description="Write, speak, and check in. Your entries are encrypted and shape your Emotional Twin."
       />
+
+      {/* ── Mood Check-in ── */}
+      <Card className="animate-fade-in-up">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <SmilePlus className="w-5 h-5 text-emerald-500" />
+            Mood Check-in
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-4 gap-3 mb-6">
+            {moods.map((m) => (
+              <button
+                key={m.label}
+                onClick={() => setSelectedMood(m.label)}
+                className={cn(
+                  "flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all",
+                  selectedMood === m.label
+                    ? `${m.color} scale-105 shadow-md`
+                    : "bg-white border-[var(--color-border)] hover:bg-slate-50"
+                )}
+              >
+                <span className={cn("text-2xl", selectedMood === m.label && "pulse-soft")}>
+                  {m.emoji}
+                </span>
+                <span className="text-xs font-medium">{m.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Sliders */}
+          <div className="grid md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="font-medium">Energy</span>
+                <span className="text-[var(--color-text-muted)] font-semibold">{energy}/10</span>
+              </div>
+              <input type="range" min={1} max={10} value={energy} onChange={(e) => setEnergy(Number(e.target.value))} aria-label={`Energy level: ${energy} out of 10`} className="w-full accent-amber-500 h-2" />
+              <div className="flex justify-between text-xs text-[var(--color-text-muted)] mt-1"><span>Low</span><span>High</span></div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="font-medium">Stress</span>
+                <span className="text-[var(--color-text-muted)] font-semibold">{stress}/10</span>
+              </div>
+              <input type="range" min={1} max={10} value={stress} onChange={(e) => setStress(Number(e.target.value))} aria-label={`Stress level: ${stress} out of 10`} className="w-full accent-red-500 h-2" />
+              <div className="flex justify-between text-xs text-[var(--color-text-muted)] mt-1"><span>Relaxed</span><span>Stressed</span></div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="font-medium">Social Battery</span>
+                <span className="text-[var(--color-text-muted)] font-semibold">{social}/10</span>
+              </div>
+              <input type="range" min={1} max={10} value={social} onChange={(e) => setSocial(Number(e.target.value))} aria-label={`Social battery: ${social} out of 10`} className="w-full accent-blue-500 h-2" />
+              <div className="flex justify-between text-xs text-[var(--color-text-muted)] mt-1"><span>Need alone</span><span>Social</span></div>
+            </div>
+          </div>
+
+          {/* Optional mood notes */}
+          <textarea
+            value={moodNotes}
+            onChange={(e) => setMoodNotes(e.target.value)}
+            rows={2}
+            placeholder="Anything else to add? (optional)"
+            className="w-full text-sm leading-relaxed resize-none border border-[var(--color-border)] rounded-xl px-4 py-2 outline-none placeholder:text-slate-300 bg-transparent mb-4"
+          />
+
+          <div className="flex justify-end">
+            <Button onClick={handleMoodSubmit} disabled={!selectedMood || moodSubmitting} size="sm">
+              {moodSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {moodSubmitting ? "Submitting..." : "Submit Check-in"}
+            </Button>
+          </div>
+
+          {/* Recent moods mini-row */}
+          {moodHistory && moodHistory.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
+              <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2">Recent moods</p>
+              <div className="flex gap-2">
+                {moodHistory.slice(0, 7).map((m: MoodHistoryEntry, i: number) => (
+                  <div key={i} className="flex flex-col items-center gap-1">
+                    <span className="text-lg">{MOOD_EMOJI[m.mood_label] ?? "📝"}</span>
+                    <span className="text-[10px] text-[var(--color-text-muted)]">
+                      {new Date(m.created_at).toLocaleDateString(undefined, { weekday: "short" })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Journal prompts */}
       <div className="animate-fade-in-up">
@@ -212,9 +370,9 @@ export default function JournalPage() {
 
       {/* Submitted toast */}
       <Toast
-        message="Journal submitted! Your Twin is updating..."
-        visible={submitted}
-        onDismiss={() => setSubmitted(false)}
+        message={toastMessage}
+        visible={submitted || moodSubmitted}
+        onDismiss={() => { setSubmitted(false); setMoodSubmitted(false); }}
       />
 
       {/* Past entries (real data from API) */}

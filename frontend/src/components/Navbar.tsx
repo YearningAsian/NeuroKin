@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import {
   Brain,
   BookHeart,
-  SmilePlus,
   Users,
   User,
   Menu,
@@ -20,7 +19,6 @@ import { useAuth } from "@/lib/auth";
 const navLinks = [
   { href: "/dashboard", label: "Dashboard", icon: Brain },
   { href: "/journal", label: "Journal", icon: BookHeart },
-  { href: "/mood", label: "Mood", icon: SmilePlus },
   { href: "/connections", label: "Connections", icon: Users },
   { href: "/profile", label: "My Twin", icon: User },
 ];

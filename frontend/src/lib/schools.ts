@@ -1,9 +1,4 @@
-// Comprehensive list of US colleges and universities
-// Includes major state universities, private universities, liberal arts colleges,
-// HBCUs, community colleges, and technical institutions.
-
 export const US_SCHOOLS: string[] = [
-  // Ivy League
   "Harvard University",
   "Yale University",
   "Princeton University",
@@ -12,8 +7,6 @@ export const US_SCHOOLS: string[] = [
   "Brown University",
   "Dartmouth College",
   "Cornell University",
-
-  // Top Private Universities
   "Stanford University",
   "Massachusetts Institute of Technology",
   "California Institute of Technology",
@@ -85,8 +78,6 @@ export const US_SCHOOLS: string[] = [
   "Drake University",
   "Bradley University",
   "Valparaiso University",
-
-  // UC System
   "University of California, Berkeley",
   "University of California, Los Angeles",
   "University of California, San Diego",
@@ -96,8 +87,6 @@ export const US_SCHOOLS: string[] = [
   "University of California, Santa Cruz",
   "University of California, Riverside",
   "University of California, Merced",
-
-  // CSU System
   "San Diego State University",
   "San Jose State University",
   "Cal Poly San Luis Obispo",
@@ -120,8 +109,6 @@ export const US_SCHOOLS: string[] = [
   "Humboldt State University",
   "Sonoma State University",
   "Chico State University",
-
-  // Big State Universities
   "University of Michigan",
   "University of Virginia",
   "University of North Carolina at Chapel Hill",
@@ -231,8 +218,6 @@ export const US_SCHOOLS: string[] = [
   "University of Massachusetts Lowell",
   "University of Maryland, Baltimore County",
   "Towson University",
-
-  // Liberal Arts Colleges
   "Williams College",
   "Amherst College",
   "Swarthmore College",
@@ -293,8 +278,6 @@ export const US_SCHOOLS: string[] = [
   "Bennington College",
   "Hampshire College",
   "Bard College",
-
-  // HBCUs
   "Howard University",
   "Spelman College",
   "Morehouse College",
@@ -325,8 +308,6 @@ export const US_SCHOOLS: string[] = [
   "Southern University",
   "Virginia State University",
   "Winston-Salem State University",
-
-  // Art & Design Schools
   "Rhode Island School of Design",
   "School of the Art Institute of Chicago",
   "Parsons School of Design",
@@ -343,16 +324,11 @@ export const US_SCHOOLS: string[] = [
   "Juilliard School",
   "Manhattan School of Music",
   "New England Conservatory",
-  "Berklee College of Music",
-
-  // Military Academies
   "United States Military Academy (West Point)",
   "United States Naval Academy",
   "United States Air Force Academy",
   "United States Coast Guard Academy",
   "United States Merchant Marine Academy",
-
-  // Prominent Regional Universities
   "Appalachian State University",
   "College of Charleston",
   "University of North Carolina at Charlotte",
@@ -370,7 +346,6 @@ export const US_SCHOOLS: string[] = [
   "University of West Florida",
   "Jacksonville University",
   "Rollins College",
-  "Stetson University",
   "Embry-Riddle Aeronautical University",
   "University of Tampa",
   "Coastal Carolina University",
@@ -400,7 +375,6 @@ export const US_SCHOOLS: string[] = [
   "Weber State University",
   "Utah State University",
   "Brigham Young University",
-  "University of Portland",
   "Portland State University",
   "Eastern Washington University",
   "Central Washington University",
@@ -435,8 +409,6 @@ export const US_SCHOOLS: string[] = [
   "University of Nebraska at Kearney",
   "South Dakota State University",
   "North Dakota State University",
-
-  // Community Colleges (representative selection)
   "Santa Monica College",
   "Pasadena City College",
   "De Anza College",
@@ -499,8 +471,6 @@ export const US_SCHOOLS: string[] = [
   "Green River College",
   "Highline College",
   "Salt Lake Community College",
-
-  // Additional Notable Schools
   "Brigham Young University-Idaho",
   "Liberty University",
   "Grand Canyon University",
@@ -563,7 +533,6 @@ export const US_SCHOOLS: string[] = [
   "Misericordia University",
   "King's College",
   "Wilkes University",
-  "University of Scranton",
   "Marywood University",
   "Hood College",
   "McDaniel College",
@@ -643,14 +612,12 @@ export const US_SCHOOLS: string[] = [
   "Nebraska Wesleyan University",
   "Hastings College",
   "Doane University",
-  "Creighton University",
   "College of Saint Mary",
   "Augustana University",
   "University of Sioux Falls",
   "Dakota Wesleyan University",
   "University of Jamestown",
   "Concordia College",
-  "St. Olaf College",
   "Gustavus Adolphus College",
   "Hamline University",
   "Augsburg University",
@@ -709,10 +676,8 @@ export const US_SCHOOLS: string[] = [
   "Taylor University",
   "Anderson University",
   "Franklin College",
-  "Wabash College",
   "Transylvania University",
   "Berea College",
-  "Centre College",
   "Asbury University",
   "Thomas More University",
   "Bellarmine University",
@@ -724,9 +689,6 @@ export const US_SCHOOLS: string[] = [
   "Walsh University",
   "Ashland University",
   "University of Mount Union",
-
-  // Technology & Specialized
-  "Georgia Institute of Technology",
   "Illinois Institute of Technology",
   "New Jersey Institute of Technology",
   "Florida Institute of Technology",
@@ -734,11 +696,6 @@ export const US_SCHOOLS: string[] = [
   "Kettering University",
   "Milwaukee School of Engineering",
   "Webb Institute",
-
-  // More State Flagships & Major Public
-  "University of Alaska Anchorage",
-  "University of Alaska Fairbanks",
-  "College of William & Mary",
   "SUNY College at Geneseo",
   "SUNY College at New Paltz",
   "SUNY College at Oswego",
@@ -749,4 +706,4 @@ export const US_SCHOOLS: string[] = [
   "SUNY College at Brockport",
   "SUNY College at Fredonia",
   "SUNY Polytechnic Institute",
-].sort();
+];

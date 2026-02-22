@@ -48,7 +48,7 @@ function ChatWindow({
   const handleSend = () => {
     if (!text.trim()) return;
     const msg: ChatMessage = {
-      id: `usr-${Date.now()}`,
+      id: `usr-${crypto.randomUUID()}`,
       sender: "user",
       senderName: userName,
       text: text.trim(),
