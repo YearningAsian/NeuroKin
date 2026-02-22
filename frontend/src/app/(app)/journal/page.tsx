@@ -66,6 +66,7 @@ type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
 declare global {
   interface Window {
+    heresSpeechRecognition?: SpeechRecognitionConstructor;
     SpeechRecognition?: SpeechRecognitionConstructor;
     webkitSpeechRecognition?: SpeechRecognitionConstructor;
   }
@@ -77,10 +78,13 @@ export default function JournalPage() {
   const [text, setText] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [tried, setTried] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [entriesLimit, setEntriesLimit] = useState(5);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const [isMoodListening, setIsMoodListening] = useState(false);
+  const moodRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   // Mood check-in state
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
@@ -88,8 +92,6 @@ export default function JournalPage() {
   const [stress, setStress] = useState(5);
   const [social, setSocial] = useState(5);
   const [moodNotes, setMoodNotes] = useState("");
-  const [moodSubmitted, setMoodSubmitted] = useState(false);
-  const [moodSubmitting, setMoodSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
   const speechSupported =
@@ -111,55 +113,47 @@ export default function JournalPage() {
   const { data: moodHistory } = useFetch(moodFetcher);
 
   const handleSubmit = async () => {
-    if (!text.trim() || submitting) return;
+    setTried(true);
+    const hasText = text.trim().length > 0;
+    if (!hasText || submitting) return;
     setSubmitting(true);
     try {
+      // Submit journal entry
       await submitJournal({
         student_id: studentId,
         text,
         mood_label: selectedMood?.toLowerCase(),
       });
-      setToastMessage("Journal submitted! Your Twin is updating...");
+      // Submit mood check-in if a mood is selected
+      if (selectedMood) {
+        await submitMood({
+          student_id: studentId,
+          mood_label: selectedMood.toLowerCase(),
+          energy_level: energy,
+          stress_level: stress,
+          social_battery: social,
+          notes: moodNotes || undefined,
+        });
+      }
+      setToastMessage(
+        selectedMood
+          ? "Journal & mood submitted! Your Twin is updating..."
+          : "Journal submitted! Your Twin is updating...",
+      );
       setSubmitted(true);
+      setTried(false);
       setTimeout(() => setSubmitted(false), 3000);
       setText("");
-      // Refresh entries & mood history
+      setSelectedMood(null);
+      setEnergy(5);
+      setStress(5);
+      setSocial(5);
+      setMoodNotes("");
       setRefreshKey((k) => k + 1);
     } catch (err) {
-      console.error("Journal submit failed:", err);
+      console.error("Submit failed:", err);
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleMoodSubmit = async () => {
-    if (!selectedMood || moodSubmitting) return;
-    setMoodSubmitting(true);
-    try {
-      await submitMood({
-        student_id: studentId,
-        mood_label: selectedMood.toLowerCase(),
-        energy_level: energy,
-        stress_level: stress,
-        social_battery: social,
-        notes: moodNotes || undefined,
-      });
-      setToastMessage("Mood recorded! Your Twin has been updated.");
-      setMoodSubmitted(true);
-      setTimeout(() => {
-        setMoodSubmitted(false);
-        setSelectedMood(null);
-        setEnergy(5);
-        setStress(5);
-        setSocial(5);
-        setMoodNotes("");
-      }, 3000);
-      // Refresh data
-      setRefreshKey((k) => k + 1);
-    } catch (err) {
-      console.error("Mood submit failed:", err);
-    } finally {
-      setMoodSubmitting(false);
     }
   };
 
@@ -188,6 +182,34 @@ export default function JournalPage() {
     recognition.onerror = () => setIsListening(false);
     recognitionRef.current = recognition;
     setIsListening(true);
+    recognition.start();
+  };
+
+  const toggleMoodListening = () => {
+    if (typeof window === "undefined") return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    if (isMoodListening && moodRecognitionRef.current) {
+      moodRecognitionRef.current.stop();
+      setIsMoodListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript?.trim();
+      if (transcript) {
+        setMoodNotes((prev) => (prev.trim() ? `${prev}\n${transcript}` : transcript));
+      }
+    };
+    recognition.onend = () => setIsMoodListening(false);
+    recognition.onerror = () => setIsMoodListening(false);
+    moodRecognitionRef.current = recognition;
+    setIsMoodListening(true);
     recognition.start();
   };
 
@@ -263,14 +285,20 @@ export default function JournalPage() {
             onChange={(e) => setMoodNotes(e.target.value)}
             rows={2}
             placeholder="Anything else to add? (optional)"
-            className="w-full text-sm leading-relaxed resize-none border border-[var(--color-border)] rounded-xl px-4 py-2 outline-none placeholder:text-slate-300 bg-transparent mb-4"
+            className="w-full text-sm leading-relaxed resize-none border border-[var(--color-border)] rounded-xl px-4 py-2 outline-none placeholder:text-slate-300 bg-transparent"
           />
-
-          <div className="flex justify-end">
-            <Button onClick={handleMoodSubmit} disabled={!selectedMood || moodSubmitting} size="sm">
-              {moodSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              {moodSubmitting ? "Submitting..." : "Submit Check-in"}
-            </Button>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-xs text-[var(--color-text-muted)]">{moodNotes.length} characters</span>
+            {speechSupported && (
+              <Button
+                onClick={toggleMoodListening}
+                variant={isMoodListening ? "secondary" : "outline"}
+                size="sm"
+              >
+                {isMoodListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                {isMoodListening ? "Stop" : "Speak"}
+              </Button>
+            )}
           </div>
 
           {/* Recent moods mini-row */}
@@ -327,14 +355,20 @@ export default function JournalPage() {
       </div>
 
       {/* Writing area */}
-      <Card className="animate-fade-in-up">
+      <Card className={cn("animate-fade-in-up", tried && !text.trim() && "ring-2 ring-red-400")}>
         <CardContent className="pt-6">
+          {tried && !text.trim() && (
+            <p className="text-xs text-red-500 mb-2 font-medium">Please write something before submitting.</p>
+          )}
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={8}
-            placeholder="Start writing or speaking... What's on your mind?"
-            className="w-full text-base leading-relaxed resize-none border-0 outline-none placeholder:text-slate-300 bg-transparent"
+            placeholder="Start writing or speaking... What's on your mind? *"
+            className={cn(
+              "w-full text-base leading-relaxed resize-none border-0 outline-none placeholder:text-slate-300 bg-transparent",
+              tried && !text.trim() && "placeholder:text-red-400"
+            )}
           />
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-[var(--color-border)]">
             <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
@@ -357,11 +391,11 @@ export default function JournalPage() {
               </span>
               <Button
                 onClick={handleSubmit}
-                disabled={!text.trim() || submitting}
+                disabled={submitting}
                 size="sm"
               >
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                {submitting ? "Submitting..." : "Submit Entry"}
+                {submitting ? "Submitting..." : "Submit"}
               </Button>
             </div>
           </div>
@@ -371,8 +405,8 @@ export default function JournalPage() {
       {/* Submitted toast */}
       <Toast
         message={toastMessage}
-        visible={submitted || moodSubmitted}
-        onDismiss={() => { setSubmitted(false); setMoodSubmitted(false); }}
+        visible={submitted}
+        onDismiss={() => setSubmitted(false)}
       />
 
       {/* Past entries (real data from API) */}

@@ -55,7 +55,8 @@ function ChatWindow({
       timestamp: new Date().toISOString(),
     };
     appendMessage(studentId, connection.peerId, msg);
-    setMessages((prev) => [...prev, msg]);
+    // Don't manually append — the "connections-updated" event listener
+    // will sync messages from localStorage to avoid duplicates.
     setText("");
   };
 

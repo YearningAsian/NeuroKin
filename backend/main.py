@@ -1082,86 +1082,188 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 
 def _seed_demo_data():
-    """Populate _demo_store with realistic sample students so the API is immediately useful."""
+    """Populate _demo_store with 20 Duke University students with realistic, varied profiles."""
     profiles = [
+        # ── Cluster A: Tech / AI enthusiasts (high mutual compatibility ~85-95%) ──
         {
-            "id": "demo-alex",
-            "name": "Alex",
-            "emotions": {"curiosity": 0.35, "joy": 0.25, "determination": 0.20, "calm": 0.12, "anxiety": 0.08},
-            "themes": ["artificial intelligence", "music", "hiking", "mindfulness", "photography"],
-            "activities": ["coding", "guitar", "trail running", "reading"],
+            "id": "duke-emma", "name": "Emma", "school": "Duke University",
+            "emotions": {"curiosity": 0.35, "joy": 0.25, "determination": 0.20, "calm": 0.12, "excitement": 0.08},
+            "themes": ["artificial intelligence", "coding", "hiking", "mindfulness", "music"],
+            "activities": ["coding", "trail running", "reading", "guitar"],
             "values": ["creativity", "growth", "authenticity"],
-            "energy": 72,
-            "mood_stability": 78,
-            "schedule": 0.6,
+            "energy": 75, "mood_stability": 80, "schedule": 0.7,
         },
         {
-            "id": "demo-jordan",
-            "name": "Jordan",
-            "emotions": {"empathy": 0.30, "calm": 0.25, "curiosity": 0.20, "hope": 0.15, "nostalgia": 0.10},
-            "themes": ["psychology", "creative writing", "sustainability", "yoga", "mindfulness"],
-            "activities": ["journaling", "yoga", "volunteering", "reading"],
-            "values": ["empathy", "sustainability", "authenticity"],
-            "energy": 55,
-            "mood_stability": 85,
-            "schedule": 0.5,
+            "id": "duke-liam", "name": "Liam", "school": "Duke University",
+            "emotions": {"curiosity": 0.30, "joy": 0.25, "calm": 0.20, "determination": 0.15, "hope": 0.10},
+            "themes": ["artificial intelligence", "coding", "hiking", "meditation", "robotics"],
+            "activities": ["coding", "trail running", "reading", "gaming"],
+            "values": ["growth", "innovation", "creativity"],
+            "energy": 70, "mood_stability": 82, "schedule": 0.65,
         },
         {
-            "id": "demo-sam",
-            "name": "Sam",
-            "emotions": {"excitement": 0.30, "joy": 0.25, "determination": 0.20, "anxiety": 0.15, "curiosity": 0.10},
-            "themes": ["entrepreneurship", "fitness", "travel", "cooking", "music"],
-            "activities": ["basketball", "cooking", "guitar", "coding"],
-            "values": ["ambition", "teamwork", "growth"],
-            "energy": 85,
-            "mood_stability": 65,
-            "schedule": 0.7,
+            "id": "duke-sophia", "name": "Sophia", "school": "Duke University",
+            "emotions": {"curiosity": 0.30, "determination": 0.25, "calm": 0.20, "joy": 0.15, "excitement": 0.10},
+            "themes": ["artificial intelligence", "coding", "yoga", "nature", "music"],
+            "activities": ["coding", "yoga", "reading", "guitar"],
+            "values": ["creativity", "growth", "authenticity"],
+            "energy": 68, "mood_stability": 85, "schedule": 0.6,
         },
         {
-            "id": "demo-riley",
-            "name": "Riley",
-            "emotions": {"calm": 0.30, "curiosity": 0.25, "joy": 0.15, "reflection": 0.15, "gratitude": 0.15},
-            "themes": ["astronomy", "reading", "meditation", "art history", "hiking"],
-            "activities": ["stargazing", "painting", "reading", "trail running"],
-            "values": ["knowledge", "patience", "creativity"],
-            "energy": 45,
-            "mood_stability": 90,
-            "schedule": 0.4,
-        },
-        {
-            "id": "demo-casey",
-            "name": "Casey",
-            "emotions": {"determination": 0.30, "curiosity": 0.25, "anxiety": 0.20, "hope": 0.15, "frustration": 0.10},
-            "themes": ["computer science", "gaming", "music production", "artificial intelligence", "robotics"],
+            "id": "duke-ethan", "name": "Ethan", "school": "Duke University",
+            "emotions": {"curiosity": 0.25, "determination": 0.25, "excitement": 0.20, "joy": 0.15, "anxiety": 0.15},
+            "themes": ["coding", "computer science", "gaming", "artificial intelligence", "music production"],
             "activities": ["coding", "gaming", "guitar", "reading"],
             "values": ["innovation", "creativity", "growth"],
-            "energy": 68,
-            "mood_stability": 70,
-            "schedule": 0.8,
+            "energy": 72, "mood_stability": 70, "schedule": 0.75,
+        },
+
+        # ── Cluster B: Creative / Empathetic (high mutual ~80-90%) ──
+        {
+            "id": "duke-olivia", "name": "Olivia", "school": "Duke University",
+            "emotions": {"empathy": 0.30, "joy": 0.25, "calm": 0.20, "hope": 0.15, "nostalgia": 0.10},
+            "themes": ["poetry", "community", "dance", "mindfulness", "psychology"],
+            "activities": ["dance", "volunteering", "journaling", "yoga"],
+            "values": ["empathy", "community", "authenticity"],
+            "energy": 62, "mood_stability": 78, "schedule": 0.5,
         },
         {
-            "id": "demo-morgan",
-            "name": "Morgan",
-            "emotions": {"empathy": 0.35, "joy": 0.20, "nostalgia": 0.15, "calm": 0.15, "hope": 0.15},
-            "themes": ["social justice", "poetry", "dance", "community", "mindfulness"],
-            "activities": ["dance", "volunteering", "journaling", "yoga"],
-            "values": ["justice", "community", "empathy"],
-            "energy": 62,
-            "mood_stability": 75,
-            "schedule": 0.5,
+            "id": "duke-noah", "name": "Noah", "school": "Duke University",
+            "emotions": {"empathy": 0.28, "calm": 0.25, "curiosity": 0.20, "hope": 0.15, "joy": 0.12},
+            "themes": ["psychology", "creative writing", "music", "volunteering", "mindfulness"],
+            "activities": ["journaling", "yoga", "volunteering", "reading"],
+            "values": ["empathy", "sustainability", "authenticity"],
+            "energy": 55, "mood_stability": 86, "schedule": 0.5,
+        },
+        {
+            "id": "duke-ava", "name": "Ava", "school": "Duke University",
+            "emotions": {"empathy": 0.30, "determination": 0.20, "calm": 0.20, "hope": 0.15, "joy": 0.15},
+            "themes": ["social justice", "creative writing", "yoga", "community", "mindfulness"],
+            "activities": ["volunteering", "yoga", "journaling", "dance"],
+            "values": ["justice", "empathy", "community"],
+            "energy": 60, "mood_stability": 80, "schedule": 0.55,
+        },
+        {
+            "id": "duke-isabella", "name": "Isabella", "school": "Duke University",
+            "emotions": {"empathy": 0.25, "nostalgia": 0.20, "joy": 0.20, "calm": 0.20, "hope": 0.15},
+            "themes": ["poetry", "dance", "psychology", "music", "mindfulness"],
+            "activities": ["dance", "journaling", "yoga", "reading"],
+            "values": ["community", "empathy", "creativity"],
+            "energy": 58, "mood_stability": 82, "schedule": 0.45,
+        },
+
+        # ── Cluster C: Entrepreneurial / Athletic (mutual ~75-85%) ──
+        {
+            "id": "duke-jackson", "name": "Jackson", "school": "Duke University",
+            "emotions": {"excitement": 0.30, "determination": 0.25, "joy": 0.20, "anxiety": 0.15, "curiosity": 0.10},
+            "themes": ["entrepreneurship", "fitness", "basketball", "cooking", "travel"],
+            "activities": ["basketball", "cooking", "coding", "trail running"],
+            "values": ["ambition", "teamwork", "growth"],
+            "energy": 88, "mood_stability": 65, "schedule": 0.7,
+        },
+        {
+            "id": "duke-mia", "name": "Mia", "school": "Duke University",
+            "emotions": {"excitement": 0.25, "joy": 0.25, "determination": 0.20, "curiosity": 0.15, "hope": 0.15},
+            "themes": ["entrepreneurship", "fitness", "travel", "photography", "cooking"],
+            "activities": ["trail running", "cooking", "yoga", "basketball"],
+            "values": ["ambition", "growth", "teamwork"],
+            "energy": 82, "mood_stability": 70, "schedule": 0.65,
+        },
+        {
+            "id": "duke-aiden", "name": "Aiden", "school": "Duke University",
+            "emotions": {"determination": 0.30, "excitement": 0.25, "joy": 0.20, "anxiety": 0.15, "curiosity": 0.10},
+            "themes": ["fitness", "basketball", "entrepreneurship", "music", "travel"],
+            "activities": ["basketball", "guitar", "trail running", "coding"],
+            "values": ["teamwork", "ambition", "growth"],
+            "energy": 85, "mood_stability": 68, "schedule": 0.75,
+        },
+
+        # ── Cluster D: Academic / Reflective (mutual ~70-80%) ──
+        {
+            "id": "duke-charlotte", "name": "Charlotte", "school": "Duke University",
+            "emotions": {"calm": 0.30, "curiosity": 0.25, "reflection": 0.20, "gratitude": 0.15, "joy": 0.10},
+            "themes": ["philosophy", "reading", "astronomy", "art history", "meditation"],
+            "activities": ["reading", "stargazing", "painting", "yoga"],
+            "values": ["knowledge", "patience", "creativity"],
+            "energy": 42, "mood_stability": 92, "schedule": 0.35,
+        },
+        {
+            "id": "duke-lucas", "name": "Lucas", "school": "Duke University",
+            "emotions": {"curiosity": 0.30, "calm": 0.25, "reflection": 0.20, "nostalgia": 0.15, "joy": 0.10},
+            "themes": ["reading", "philosophy", "astronomy", "creative writing", "nature"],
+            "activities": ["reading", "stargazing", "journaling", "trail running"],
+            "values": ["knowledge", "patience", "authenticity"],
+            "energy": 45, "mood_stability": 88, "schedule": 0.4,
+        },
+        {
+            "id": "duke-amelia", "name": "Amelia", "school": "Duke University",
+            "emotions": {"reflection": 0.25, "nostalgia": 0.25, "calm": 0.20, "curiosity": 0.20, "joy": 0.10},
+            "themes": ["art history", "reading", "philosophy", "museum", "journaling"],
+            "activities": ["reading", "painting", "journaling", "yoga"],
+            "values": ["knowledge", "creativity", "patience"],
+            "energy": 40, "mood_stability": 90, "schedule": 0.3,
+        },
+
+        # ── Diverse / Cross-cluster (creates varied scores across all clusters) ──
+        {
+            "id": "duke-harper", "name": "Harper", "school": "Duke University",
+            "emotions": {"joy": 0.30, "excitement": 0.25, "anxiety": 0.20, "hope": 0.15, "empathy": 0.10},
+            "themes": ["theater", "singing", "dance", "photography", "travel"],
+            "activities": ["dance", "cooking", "yoga", "volunteering"],
+            "values": ["creativity", "community", "growth"],
+            "energy": 78, "mood_stability": 60, "schedule": 0.55,
+        },
+        {
+            "id": "duke-mason", "name": "Mason", "school": "Duke University",
+            "emotions": {"curiosity": 0.35, "determination": 0.25, "calm": 0.20, "anxiety": 0.10, "joy": 0.10},
+            "themes": ["chemistry", "research", "nature", "reading", "meditation"],
+            "activities": ["reading", "trail running", "coding", "stargazing"],
+            "values": ["knowledge", "innovation", "patience"],
+            "energy": 50, "mood_stability": 84, "schedule": 0.4,
+        },
+        {
+            "id": "duke-ella", "name": "Ella", "school": "Duke University",
+            "emotions": {"excitement": 0.35, "joy": 0.30, "curiosity": 0.15, "hope": 0.10, "anxiety": 0.10},
+            "themes": ["fashion", "photography", "travel", "music", "cooking"],
+            "activities": ["cooking", "yoga", "dance", "guitar"],
+            "values": ["creativity", "growth", "community"],
+            "energy": 90, "mood_stability": 55, "schedule": 0.8,
+        },
+        {
+            "id": "duke-james", "name": "James", "school": "Duke University",
+            "emotions": {"calm": 0.35, "reflection": 0.25, "curiosity": 0.20, "nostalgia": 0.10, "gratitude": 0.10},
+            "themes": ["hiking", "nature", "reading", "philosophy", "meditation"],
+            "activities": ["trail running", "reading", "stargazing", "painting"],
+            "values": ["patience", "knowledge", "authenticity"],
+            "energy": 35, "mood_stability": 95, "schedule": 0.3,
+        },
+        {
+            "id": "duke-scarlett", "name": "Scarlett", "school": "Duke University",
+            "emotions": {"determination": 0.30, "hope": 0.25, "empathy": 0.20, "joy": 0.15, "anxiety": 0.10},
+            "themes": ["sustainability", "social justice", "nature", "community", "volunteering"],
+            "activities": ["volunteering", "trail running", "yoga", "reading"],
+            "values": ["sustainability", "justice", "community"],
+            "energy": 65, "mood_stability": 75, "schedule": 0.5,
+        },
+        {
+            "id": "duke-benjamin", "name": "Benjamin", "school": "Duke University",
+            "emotions": {"determination": 0.35, "anxiety": 0.25, "curiosity": 0.20, "excitement": 0.10, "joy": 0.10},
+            "themes": ["finance", "entrepreneurship", "basketball", "cooking", "travel"],
+            "activities": ["basketball", "cooking", "coding", "reading"],
+            "values": ["ambition", "growth", "innovation"],
+            "energy": 80, "mood_stability": 58, "schedule": 0.85,
         },
     ]
 
     for p in profiles:
-        # Create student record with password (demo password = "demo")
         _demo_store["students"][p["id"]] = {
             "student_id": p["id"],
             "display_name": p["name"],
             "password_hash": _hash_password("demo"),
+            "school": p.get("school", "Duke University"),
             "onboarded": True,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
-        # Build a pseudo-text to generate a deterministic embedding
         seed_text = f"{p['name']} cares about {', '.join(p['themes'][:3])}. " \
                     f"Values: {', '.join(p['values'])}. Activities: {', '.join(p['activities'])}."
         twin = TwinSnapshot(
@@ -1179,7 +1281,7 @@ def _seed_demo_data():
         )
         _demo_store["twin_snapshots"][p["id"]] = twin
 
-    logger.info("Seeded %d demo students.", len(profiles))
+    logger.info("Seeded %d Duke University demo students.", len(profiles))
 
 
 @app.on_event("startup")
