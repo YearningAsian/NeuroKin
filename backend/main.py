@@ -494,13 +494,13 @@ def _demo_explain(me: TwinSnapshot, peer: TwinSnapshot, shared: list, score: flo
     else:
         parts.append(
             f"Your {me_top_emo}-driven emotional pattern complements {peer.display_name}'s "
-            f"{peer_top_emo} energy — Cortex identifies this as a balanced dynamic "
+            f"{peer_top_emo} energy — AI identifies this as a balanced dynamic "
             f"where you can both grow."
         )
     if shared_values:
         parts.append(
             f"You share core values around {' and '.join(shared_values[:2])}, "
-            f"which Cortex flags as a strong foundation for meaningful connection."
+            f"which AI flags as a strong foundation for meaningful connection."
         )
     if shared_activities:
         parts.append(

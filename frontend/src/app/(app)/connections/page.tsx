@@ -112,15 +112,6 @@ function DropdownMenu({
   );
 }
 
-              {a.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ── Preview Conversation Modal ── */
 
 function PreviewConversationModal({
@@ -430,7 +421,7 @@ function RecommendationCard({
               <div>
                 <h4 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-[var(--color-primary)]" />
-                  Cortex AI Analysis
+                  Why you match
                 </h4>
                 <p className="text-sm text-[var(--color-text)] leading-relaxed">
                   {match.explanation}
