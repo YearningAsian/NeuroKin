@@ -208,3 +208,22 @@ export async function submitActivity(
   });
   return parseResponse(res);
 }
+
+// --- Preview Conversation ---
+
+export interface ConversationTurn {
+  speaker: string;
+  text: string;
+}
+
+export async function previewConversation(
+  studentId: string,
+  peerId: string,
+): Promise<{ conversation: ConversationTurn[] }> {
+  const res = await fetch(`${API_BASE}/preview-conversation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ student_id: studentId, peer_id: peerId }),
+  });
+  return parseResponse(res);
+}

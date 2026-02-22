@@ -19,6 +19,9 @@ import {
   Trash2,
   Ban,
   Flag,
+  Play,
+  X,
+  Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -26,7 +29,9 @@ import {
   submitFeedback,
   blockUser,
   reportUser,
+  previewConversation,
   type PeerRecommendation,
+  type ConversationTurn,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useFetch } from "@/hooks/useFetch";
@@ -107,6 +112,183 @@ function DropdownMenu({
   );
 }
 
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Preview Conversation Modal ── */
+
+function PreviewConversationModal({
+  studentId,
+  peerId,
+  studentName,
+  peerName,
+  onClose,
+}: {
+  studentId: string;
+  peerId: string;
+  studentName: string;
+  peerName: string;
+  onClose: () => void;
+}) {
+  const [turns, setTurns] = useState<ConversationTurn[]>([]);
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    previewConversation(studentId, peerId)
+      .then((data) => {
+        if (cancelled) return;
+        setTurns(data.conversation);
+        setLoading(false);
+        // Reveal turns one at a time with a delay
+        let i = 0;
+        const reveal = () => {
+          if (cancelled || i >= data.conversation.length) return;
+          i++;
+          setVisibleCount(i);
+          setTimeout(reveal, 1200 + Math.random() * 800);
+        };
+        setTimeout(reveal, 600);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message || "Failed to generate preview");
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [studentId, peerId]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [visibleCount]);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in-up">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[80vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
+          <div className="flex items-center gap-2">
+            <Bot className="w-5 h-5 text-[var(--color-primary)]" />
+            <h3 className="font-bold text-sm">
+              Twin Preview — {studentName} & {peerName}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            <X className="w-4 h-4 text-[var(--color-text-muted)]" />
+          </button>
+        </div>
+
+        {/* Explanation */}
+        <div className="px-5 py-3 bg-slate-50 border-b border-[var(--color-border)]">
+          <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+            This is a simulated conversation between your digital twin and {peerName}&apos;s
+            twin, based on your emotional profiles and interests. It&apos;s a preview of how a
+            real conversation might flow.
+          </p>
+        </div>
+
+        {/* Chat area */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-3 min-h-[300px]">
+          {loading && (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
+                <div className="w-2 h-2 bg-[var(--color-primary)] rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-[var(--color-primary)] rounded-full animate-bounce [animation-delay:0.1s]" />
+                <div className="w-2 h-2 bg-[var(--color-primary)] rounded-full animate-bounce [animation-delay:0.2s]" />
+                <span className="ml-2">Generating twin conversation…</span>
+              </div>
+            </div>
+          )}
+          {error && (
+            <p className="text-sm text-red-500 text-center">{error}</p>
+          )}
+          {turns.slice(0, visibleCount).map((turn, i) => {
+            const isMe = turn.speaker === studentName;
+            return (
+              <div
+                key={i}
+                className={cn(
+                  "flex gap-2 animate-fade-in-up",
+                  isMe ? "flex-row-reverse" : "flex-row",
+                )}
+              >
+                <img
+                  src={`https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(turn.speaker)}`}
+                  alt={turn.speaker}
+                  className="w-8 h-8 rounded-full border border-[var(--color-border)] bg-white flex-shrink-0 mt-1"
+                />
+                <div
+                  className={cn(
+                    "max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+                    isMe
+                      ? "bg-[var(--color-primary)] text-white rounded-br-md"
+                      : "bg-slate-100 text-[var(--color-text)] rounded-bl-md",
+                  )}
+                >
+                  <div className={cn(
+                    "text-[10px] font-semibold mb-0.5",
+                    isMe ? "text-white/70" : "text-[var(--color-text-muted)]"
+                  )}>
+                    {turn.speaker}&apos;s Twin
+                  </div>
+                  {turn.text}
+                </div>
+              </div>
+            );
+          })}
+          {/* Typing indicator while turns are still being revealed */}
+          {!loading && visibleCount < turns.length && (
+            <div className="flex gap-2">
+              <div className="w-8 h-8" />
+              <div className="bg-slate-100 rounded-2xl px-4 py-2.5 rounded-bl-md">
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:0.15s]" />
+                  <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:0.3s]" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-[var(--color-border)] flex justify-end">
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Close Preview
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Recommendation card (for two-col grid) ── */
 
 type CardDecision = null | "connected" | "skipped";
@@ -127,6 +309,7 @@ function RecommendationCard({
   const [expanded, setExpanded] = useState(false);
   const [decision, setDecision] = useState<CardDecision>(null);
   const [fading, setFading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const score = Math.round(match.compatibility_score);
 
   const scheduleRemoval = (d: CardDecision) => {
@@ -245,8 +428,9 @@ function RecommendationCard({
           {expanded && !decision && (
             <div className="mt-4 pt-4 border-t border-[var(--color-border)] space-y-4 animate-fade-in-up">
               <div>
-                <h4 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-1.5">
-                  Why you match
+                <h4 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[var(--color-primary)]" />
+                  Cortex AI Analysis
                 </h4>
                 <p className="text-sm text-[var(--color-text)] leading-relaxed">
                   {match.explanation}
@@ -275,6 +459,15 @@ function RecommendationCard({
                   &ldquo;{match.icebreaker}&rdquo;
                 </p>
               </div>
+
+              {/* Preview Conversation */}
+              <button
+                onClick={() => setShowPreview(true)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-[var(--color-primary)]/40 text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] transition-colors text-sm font-medium"
+              >
+                <Play className="w-4 h-4" />
+                Preview Twin Conversation
+              </button>
 
               <div className="flex gap-3">
                 <Button size="sm" onClick={handleConnect} className="flex-1">
@@ -308,6 +501,17 @@ function RecommendationCard({
           )}
         </CardContent>
       </Card>
+
+      {/* Preview Conversation Modal */}
+      {showPreview && (
+        <PreviewConversationModal
+          studentId={studentId}
+          peerId={match.peer_id}
+          studentName={userName}
+          peerName={match.display_name}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </div>
   );
 }

@@ -465,21 +465,100 @@ def _demo_extract(text: str) -> dict:
     return {"emotions": emotions, "themes": themes[:5], "social_energy_hint": social_hint}
 
 
-def _demo_explain(_me_themes: list, _peer_themes: list, shared: list, score: float) -> dict:
-    """Simulate Cortex COMPLETE explanation generation for demo mode."""
+def _demo_explain(me: TwinSnapshot, peer: TwinSnapshot, shared: list, score: float) -> dict:
+    """Simulate Cortex AI-analysis explanation generation for demo mode.
+
+    Generates a personal, AI-analysis-style 'why you match' based on
+    actual profile dimensions — themes, emotions, values, activities.
+    """
+    me_emo = sorted(me.emotion_distribution.items(), key=lambda x: x[1], reverse=True)
+    peer_emo = sorted(peer.emotion_distribution.items(), key=lambda x: x[1], reverse=True)
+    me_top_emo = me_emo[0][0] if me_emo else "curiosity"
+    peer_top_emo = peer_emo[0][0] if peer_emo else "curiosity"
+    shared_activities = list(set(me.activity_preferences) & set(peer.activity_preferences))
+    shared_values = list(set(me.shared_values_tags) & set(peer.shared_values_tags))
+
+    # Build a rich, personal explanation
+    parts: list[str] = []
+
     if shared:
-        explanation = f"You both connect through themes like {', '.join(shared[:3])}. Your emotional patterns suggest you'd understand each other well."
+        parts.append(
+            f"Cortex detected strong thematic resonance between your profiles — "
+            f"you both gravitate toward {', '.join(shared[:3])}."
+        )
+    if me_top_emo == peer_top_emo:
+        parts.append(
+            f"Your emotional signatures both center on {me_top_emo}, "
+            f"suggesting you'd naturally understand each other's inner landscape."
+        )
     else:
-        explanation = f"Your emotional profiles complement each other with a {score}% compatibility, suggesting meaningful connection potential."
-    icebreakers = [
-        "What's something you've been curious about lately?",
-        "What's a small thing that made your day better recently?",
-        "If you could learn any skill instantly, what would it be?",
-        "What's something you're proud of that most people don't know about?",
-        "What kind of music do you listen to when you need to recharge?",
-    ]
-    random.seed(int(score * 100))
-    icebreaker = random.choice(icebreakers)
+        parts.append(
+            f"Your {me_top_emo}-driven emotional pattern complements {peer.display_name}'s "
+            f"{peer_top_emo} energy — Cortex identifies this as a balanced dynamic "
+            f"where you can both grow."
+        )
+    if shared_values:
+        parts.append(
+            f"You share core values around {' and '.join(shared_values[:2])}, "
+            f"which Cortex flags as a strong foundation for meaningful connection."
+        )
+    if shared_activities:
+        parts.append(
+            f"You'd click over shared activities like {', '.join(shared_activities[:2])} — "
+            f"a natural starting point for spending time together."
+        )
+
+    # Mood stability compatibility note
+    stability_diff = abs(me.mood_stability - peer.mood_stability)
+    if stability_diff < 15:
+        parts.append(
+            "Your emotional stability patterns are closely aligned, "
+            "meaning conversations are likely to feel naturally balanced."
+        )
+
+    explanation = " ".join(parts[:3])  # Keep it concise — max 3 sentences
+
+    # Generate icebreakers tailored to shared context
+    icebreaker_pool: list[str] = []
+    if "coding" in shared or "artificial intelligence" in shared:
+        icebreaker_pool.extend([
+            f"Hey {peer.display_name}! I noticed we're both into {shared[0] if shared else 'tech'} — what project has you most excited right now?",
+            f"If you could build any AI tool to help students, what would it do?",
+        ])
+    if any(t in shared for t in ["hiking", "nature", "fitness"]):
+        icebreaker_pool.extend([
+            "What's your favorite trail around Duke? I'm always looking for new routes.",
+            "Do you have a go-to outdoor spot when you need to clear your head?",
+        ])
+    if any(t in shared for t in ["music", "dance", "theater", "singing"]):
+        icebreaker_pool.extend([
+            "What have you been listening to lately that really moves you?",
+            "Do you perform or is it more of a personal practice for you?",
+        ])
+    if any(t in shared for t in ["reading", "philosophy", "creative writing"]):
+        icebreaker_pool.extend([
+            "Read anything recently that changed how you see things?",
+            "What's a book you wish more people would read?",
+        ])
+    if any(t in shared for t in ["community", "volunteering", "social justice", "sustainability"]):
+        icebreaker_pool.extend([
+            "What cause are you most passionate about changing right now?",
+            "How did you first get into community work?",
+        ])
+    if shared_activities:
+        icebreaker_pool.append(
+            f"I hear you're into {shared_activities[0]} too — want to {shared_activities[0]} together sometime?"
+        )
+    # Fallbacks
+    icebreaker_pool.extend([
+        "What's something you've been curious about lately that most people in your life don't know about?",
+        "If you could have dinner with anyone, living or not, who would it be and why?",
+        "What's one thing that made you smile today?",
+    ])
+
+    random.seed(int(score * 100) + hash(me.student_id + peer.student_id))
+    icebreaker = random.choice(icebreaker_pool[:5]) if len(icebreaker_pool) > 5 else icebreaker_pool[0]
+
     return {"explanation": explanation, "icebreaker": icebreaker}
 
 
@@ -850,7 +929,7 @@ class ExplanationChain:
     @staticmethod
     def run(me: TwinSnapshot, peer: TwinSnapshot, score: float, shared: list[str]) -> tuple[str, str]:
         if DEMO_MODE:
-            result = _demo_explain(me.top_themes, peer.top_themes, shared, score)
+            result = _demo_explain(me, peer, shared, score)
             return result.get("explanation", ""), result.get("icebreaker", "")
 
         prompt = f"""You are NeuroTwin, an emotionally intelligent student connection assistant.
@@ -883,17 +962,12 @@ Rules:
             )
 
 
+
 def _generate_explanation(me: TwinSnapshot, peer: TwinSnapshot, score: float, shared: list[str]) -> tuple[str, str]:
     if not ENABLE_CORTEX_EXPLANATIONS:
-        if shared:
-            return (
-                f"You both connect through {', '.join(shared[:3])}, with complementary emotional patterns.",
-                "What part of your week has felt most meaningful lately?",
-            )
-        return (
-            f"Your profiles complement each other with a {score}% compatibility score.",
-            "What’s one thing you’re currently excited to learn or try?",
-        )
+        # Use the rich AI-analysis-style explain even outside DEMO_MODE when Cortex is disabled
+        result = _demo_explain(me, peer, shared, score)
+        return result.get("explanation", ""), result.get("icebreaker", "")
     return ExplanationChain.run(me, peer, score, shared)
 
 
@@ -1255,6 +1329,274 @@ def _seed_demo_data():
         },
     ]
 
+    # ── Per-student journal entries (3-5 each, realistic Duke content) ──
+    _journal_bank: dict[str, list[str]] = {
+        "duke-emma": [
+            "Spent the afternoon debugging my ML pipeline for the CS 371 project. Finally got the transformer attention heads visualized — it's wild how much structure emerges from the data. Went for a trail run on the Al Buehler trail to decompress and it really cleared my head.",
+            "Had a deep conversation with my study group about AI ethics after Professor Chen's lecture. We disagree on whether LLMs should be used in clinical settings, but I love that we can have honest debates. Feeling intellectually alive.",
+            "Played guitar for an hour after dinner instead of studying. Sometimes I forget how much music grounds me. My roommate said it was the calmest she's seen me all week.",
+            "Overwhelmed by midterms but trying to stay present. Did a 15-minute mindfulness session before bed. I keep reminding myself that grades don't define me — growth does.",
+        ],
+        "duke-liam": [
+            "Just finished building a ROS2 node for the robotics club's autonomous drone. The SLAM algorithm is finally working and I'm so proud. Stayed up way too late but it was worth it.",
+            "Meditation session this morning was rough — kept thinking about my research proposal deadline. But I pushed through 20 minutes and felt noticeably calmer afterward. Progress, not perfection.",
+            "Went on a group hike at Eno River with the AI club. We talked about consciousness and whether digital twins could ever truly represent a person. Deep stuff for a Saturday morning.",
+            "Feeling a bit isolated this week. Spent most of it in the lab. Need to be more intentional about reaching out to friends. Gaming with my high school buddy tonight helped.",
+            "Read three chapters of 'Gödel, Escher, Bach' and my mind is blown. The parallels between formal systems and consciousness are exactly what drew me to AI in the first place.",
+        ],
+        "duke-sophia": [
+            "Yoga class at Wilson was exactly what I needed today. My body has been so tense from sitting at my desk coding all week. The instructor talked about breath as a bridge between mind and body — beautiful metaphor.",
+            "Made a breakthrough on my NLP research — the fine-tuned model is actually picking up sarcasm in student feedback surveys. My advisor was impressed. Small wins matter.",
+            "Spent Sunday morning at the Duke Gardens just sitting and sketching the plants. I don't draw well but something about being in nature with a pencil feels meditative.",
+            "Had a tough conversation with my parents about wanting to pursue AI research instead of med school. They're coming around but it's emotionally draining to feel like I'm letting them down.",
+        ],
+        "duke-ethan": [
+            "Competed in the HackDuke hackathon and our team built an AI mental health chatbot in 24 hours. We didn't win but I learned so much about rapid prototyping. The energy was electric.",
+            "Anxiety was really high today before my algorithms exam. I know the material but test anxiety hits different. Listened to my lo-fi playlist and did breathing exercises in the hallway.",
+            "Started producing a new beat tonight. Music production is my escape hatch from code — same creative energy, totally different medium. Mixing frequencies is oddly therapeutic.",
+            "Feeling imposter syndrome hard in my advanced ML class. Everyone seems to know more than me. But I reminded myself I got into this program for a reason.",
+            "Late night gaming session with friends from the CS department. We played Valorant and talked about our startup ideas between rounds. These people get me.",
+        ],
+        "duke-olivia": [
+            "Led a community service project at the Durham Literacy Center today. Teaching adults to read is humbling and beautiful. One student read a full paragraph for the first time and I almost cried.",
+            "Dance rehearsal for the spring showcase was intense but so fulfilling. When we nail the choreography together it feels like we're breathing as one organism. Pure flow state.",
+            "Journaling has become my anchor. I've been writing every morning about gratitude and it's genuinely shifting my perspective. Even on hard days, I can find three good things.",
+            "Had a psych lab today where we studied empathy in primates. It made me think about how connection is literally wired into us. We're not meant to be alone.",
+        ],
+        "duke-noah": [
+            "Spent the morning volunteering at the food bank and the afternoon writing a short story for my creative writing workshop. Both feel like acts of service — one feeds bodies, the other feeds souls.",
+            "Yoga and journaling have become my daily non-negotiables. My therapist says I've made real progress with emotional regulation. It doesn't feel dramatic but the data doesn't lie.",
+            "Read bell hooks' 'All About Love' and it fundamentally shifted how I think about vulnerability. Being soft in a hard world is actually the bravest thing.",
+            "Feeling really connected to my psychology cohort this semester. We had a group processing session after the trauma lecture and it felt safe to be honest. Rare and precious.",
+            "Went for a long walk alone around campus at sunset. The Gothic architecture looks otherworldly in that light. Solitude doesn't have to mean loneliness.",
+        ],
+        "duke-ava": [
+            "Organized a panel on racial justice in education for the student union. The turnout was incredible — standing room only. These conversations matter and people are hungry for them.",
+            "Yoga teacher training is challenging me in unexpected ways. It's not just physical — it's about holding space for others' pain without absorbing it. Boundaries as compassion.",
+            "Wrote a spoken word piece about my grandmother's immigration story for the open mic. My voice shook but I got through it. Vulnerability is strength.",
+            "Feeling frustrated with the pace of institutional change. But my advisor reminded me that every movement starts with individuals. I am one of those individuals.",
+        ],
+        "duke-isabella": [
+            "Dance practice for the cultural showcase was magical today. We're blending traditional and contemporary styles and it feels like honoring the past while creating something new.",
+            "Had a long phone call with my sister about how we process emotions differently. She's more analytical, I'm more intuitive. Neither is wrong — just different ways of knowing.",
+            "Poetry workshop feedback was really affirming. My professor said my imagery has matured this semester. Writing helps me make sense of feelings I can't name yet.",
+            "Spent the evening at a mindfulness meditation group. There's something powerful about sitting in silence with strangers. Shared stillness is its own kind of intimacy.",
+            "Feeling nostalgic today. Looked through old photos and realized how much I've grown since freshman year. I barely recognize that scared girl.",
+        ],
+        "duke-jackson": [
+            "Crushed it at basketball practice today — hit five three-pointers in a row during scrimmage. Coach said my confidence is contagious for the team. Feels good to lead by example.",
+            "Pitched my startup idea at the Duke Innovation & Entrepreneurship club meeting. Got tough questions about market fit but also genuine interest from two potential co-founders. This could be real.",
+            "Cooked a Thai curry from scratch for my roommates. Cooking is how I show love. The kitchen was a mess but everyone was happy and full. Worth it.",
+            "Stressed about balancing basketball, classes, and the startup. My energy is high but I'm spreading thin. Need to prioritize better or I'll burn out.",
+            "Had a great travel conversation with Mia about our dream backpacking trip through Southeast Asia. Planning adventures makes even the grind feel purposeful.",
+        ],
+        "duke-mia": [
+            "Ran 6 miles on the trail this morning and felt like I could keep going forever. Runner's high is real and it's the best natural antidepressant I've found.",
+            "Photography walk through downtown Durham captured some incredible street art. I'm building a series about hidden beauty in overlooked places. Art is everywhere if you look.",
+            "Entrepreneurship class had us do customer discovery interviews. Talking to real people about their problems is so much more valuable than theorizing. Humbling and energizing.",
+            "Cooked Moroccan tagine for the first time — the spices smelled incredible. Food connects us to cultures we've never visited. My kitchen is my passport.",
+        ],
+        "duke-aiden": [
+            "Basketball tournament this weekend was exhausting but we made it to the semifinals. The team chemistry is the best it's been all season. We trust each other.",
+            "Started learning guitar from YouTube tutorials. My fingers hurt but I can play three chords now. Ethan said he'd jam with me when I'm ready — motivation.",
+            "Feeling the pressure of recruiting season. Every conversation feels like an interview. Went for a long run to burn off the anxiety. Movement is medicine.",
+            "Had a deep talk with Jackson about what success really means. We both grew up thinking it was money and status but now we're questioning that. Growth is uncomfortable.",
+            "Trail running at Duke Forest after a stressful week. The trees don't care about your GPA. Nature has a way of putting things in perspective.",
+        ],
+        "duke-charlotte": [
+            "Spent three hours in the Rubenstein Library reading about Stoic philosophy. Marcus Aurelius had it figured out 2000 years ago: focus on what you can control, release the rest.",
+            "Stargazing on the roof of the physics building was transcendent. Jupiter was visible and the Orion Nebula was faintly there through the telescope. We are so small and that's okay.",
+            "Painted a watercolor of the Duke Chapel at sunset. It's not perfect but the light capture feels honest. Art doesn't need to be perfect to be meaningful.",
+            "Meditation retreat this weekend was transformative. 48 hours of silence sounds terrifying but by hour 12 my mind was clearer than it's been in months.",
+        ],
+        "duke-lucas": [
+            "Finished Dostoevsky's 'The Brothers Karamazov' and I need to talk to someone about the Grand Inquisitor chapter. Free will versus safety — the oldest human tension.",
+            "Night hike to the observatory with the astronomy club. Looking at Saturn's rings through the 24-inch telescope made me emotional. Beauty at a cosmic scale.",
+            "Creative writing workshop gave great feedback on my short story about a librarian who discovers a parallel universe. Fiction lets me explore questions philosophy can only pose.",
+            "Feeling introspective today. Journaled about what I want my life to look like in 10 years. Less about career, more about how I want to feel each morning.",
+            "Trail run through the Duke Forest was peaceful. The fall colors are peaking and every turn looked like a painting. Gratitude for being exactly here, exactly now.",
+        ],
+        "duke-amelia": [
+            "Visited the Nasher Museum exhibit on Renaissance portraiture. The way artists captured inner life through external features is exactly what I want to do with words.",
+            "Read Virginia Woolf's 'To the Lighthouse' for the third time and discovered new layers. Great literature grows with you. You bring different eyes each time.",
+            "Journaling about my grandmother's stories from the old country. I want to preserve them before they fade. Memory is fragile and precious.",
+            "Painting class today — we worked with oils for the first time. The texture and depth compared to watercolors is like going from 2D to 3D. Intoxicating.",
+        ],
+        "duke-harper": [
+            "Theater rehearsal for the spring musical was incredible. We ran the full Act 2 without stopping and the energy was electric. Live performance is irreplaceable.",
+            "Sang at the open mic night at the Coffeehouse. My hands were shaking but my voice was steady. Performing is the only time my anxiety transforms into something beautiful.",
+            "Photography project documenting Durham's hidden gardens is coming together. Found an abandoned lot someone turned into a guerrilla garden. Stories are everywhere.",
+            "Feeling scattered between theater, choir, and dance. But also feeling alive. I'd rather be overwhelmed by passion than underwhelmed by safety.",
+            "Traveled home for the weekend and was reminded how much I've changed. My hometown feels smaller but also more precious. Growth means outgrowing some things.",
+        ],
+        "duke-mason": [
+            "Long day in the chemistry lab running spectroscopy experiments. The precision required is meditative in its own way. Science is patience made visible.",
+            "Hiked the Eno River trail and collected leaf samples for my ecology side project. The intersection of chemistry and nature is where the magic happens.",
+            "Meditation has become essential for managing lab stress. 20 minutes in the morning, 10 before bed. My focus during experiments has noticeably improved.",
+            "Read a paper on CRISPR applications in agriculture that made me rethink my research direction. Sometimes the best ideas come from adjacent fields.",
+        ],
+        "duke-ella": [
+            "Fashion design studio was fire today — finished my mood board for the sustainable fashion collection. Using only recycled materials forces creativity in the best way.",
+            "Spontaneous road trip to the Blue Ridge Parkway for sunset photos. The light was golden and everything felt possible. Adventure is my love language.",
+            "Cooked a fusion dinner — Korean-Mexican tacos with homemade kimchi. My friends couldn't stop eating them. Food is love made edible.",
+            "Feeling the end-of-semester energy surge. Everything is due but I'm thriving under pressure. Some people wilt under stress — I bloom.",
+            "Guitar practice is becoming my evening ritual. Learning Fleetwood Mac songs. There's something about analog instruments in a digital world that feels grounding.",
+        ],
+        "duke-james": [
+            "Six-hour hike on the Mountains-to-Sea trail today. The solitude was healing. No notifications, no deadlines, just footsteps and birdsong. This is what being alive feels like.",
+            "Reading Thoreau's 'Walden' and questioning everything about modern life. Do we own our things or do they own us? Simplicity is radical in 2026.",
+            "Stargazing alone on the observation hill. Identified three new constellations with the star chart app. The universe is the original textbook.",
+            "Painted a landscape of the Duke Forest sunrise. The colors were impossible — purple, gold, rose. Nature is the greatest artist. I'm just trying to keep up.",
+            "Meditation session was deep today. Lost track of time entirely. When I opened my eyes 40 minutes had passed but it felt like 10. Timelessness is peace.",
+        ],
+        "duke-scarlett": [
+            "Organized a campus cleanup event and 40 students showed up. Collected 200 pounds of recycling. Small actions, when multiplied by many, become movements.",
+            "Ran the Duke half-marathon for a sustainability nonprofit. Crossed the finish line crying happy tears. My body can do hard things and so can my spirit.",
+            "Community garden workshop was beautiful — taught freshmen how to compost. Watching someone's face light up when they understand the cycle of nutrients is everything.",
+            "Feeling the weight of climate anxiety today. But I channel it into action, not despair. Every compost bin, every cleaned waterway, every educated mind matters.",
+        ],
+        "duke-benjamin": [
+            "Finance club competition was intense — our team modeled a restructuring for a mock distressed company. We placed second but I learned more than any textbook could teach.",
+            "Basketball pickup game got heated but in a good way. Competition brings out something primal. Afterward we grabbed food and laughed about it. That's brotherhood.",
+            "Started coding a personal finance app as a side project. The intersection of finance and technology is where I want to build my career. Can't stop thinking about features.",
+            "Anxiety about internship applications is real. Sent out 15 applications this week. Each rejection stings but each one also means I'm trying. Persistence > talent.",
+            "Cooked for the whole floor — my mom's jollof rice recipe. The smell brought everyone out of their rooms. Food is the ultimate community builder.",
+        ],
+    }
+
+    _mood_bank: dict[str, list[dict]] = {
+        "duke-emma": [
+            {"mood": "reflective", "energy": 6, "stress": 5, "social": 7, "notes": "Long coding session, feeling accomplished but drained"},
+            {"mood": "calm", "energy": 7, "stress": 3, "social": 6, "notes": "Morning mindfulness set a good tone for the day"},
+            {"mood": "excited", "energy": 8, "stress": 4, "social": 8, "notes": "ML model finally converging — breakthrough energy"},
+            {"mood": "anxious", "energy": 5, "stress": 7, "social": 4, "notes": "Midterm week pressure building up"},
+        ],
+        "duke-liam": [
+            {"mood": "excited", "energy": 8, "stress": 4, "social": 6, "notes": "Drone SLAM algorithm working perfectly"},
+            {"mood": "calm", "energy": 6, "stress": 3, "social": 5, "notes": "Good meditation session, feeling centered"},
+            {"mood": "reflective", "energy": 5, "stress": 5, "social": 4, "notes": "Thinking about consciousness and AI"},
+            {"mood": "sad", "energy": 4, "stress": 6, "social": 3, "notes": "Feeling isolated after a week in the lab"},
+            {"mood": "happy", "energy": 7, "stress": 2, "social": 8, "notes": "Great hike with friends, recharged socially"},
+        ],
+        "duke-sophia": [
+            {"mood": "calm", "energy": 7, "stress": 2, "social": 5, "notes": "Yoga brought everything back to center"},
+            {"mood": "happy", "energy": 8, "stress": 3, "social": 7, "notes": "Research breakthrough — advisor impressed"},
+            {"mood": "reflective", "energy": 5, "stress": 4, "social": 3, "notes": "Sketching in the gardens, peaceful solitude"},
+            {"mood": "frustrated", "energy": 4, "stress": 8, "social": 6, "notes": "Difficult family conversation about career path"},
+        ],
+        "duke-ethan": [
+            {"mood": "excited", "energy": 9, "stress": 5, "social": 9, "notes": "Hackathon energy was incredible"},
+            {"mood": "anxious", "energy": 5, "stress": 8, "social": 4, "notes": "Pre-exam anxiety hitting hard"},
+            {"mood": "happy", "energy": 7, "stress": 3, "social": 6, "notes": "New beat sounds amazing, creative flow"},
+            {"mood": "frustrated", "energy": 4, "stress": 7, "social": 5, "notes": "Imposter syndrome in ML class again"},
+            {"mood": "calm", "energy": 6, "stress": 2, "social": 8, "notes": "Gaming night with CS friends, good vibes"},
+        ],
+        "duke-olivia": [
+            {"mood": "happy", "energy": 8, "stress": 2, "social": 9, "notes": "Literacy center student read a full paragraph!"},
+            {"mood": "excited", "energy": 9, "stress": 3, "social": 8, "notes": "Dance rehearsal was pure flow state"},
+            {"mood": "reflective", "energy": 6, "stress": 4, "social": 5, "notes": "Morning gratitude journaling shifting my perspective"},
+            {"mood": "calm", "energy": 5, "stress": 3, "social": 6, "notes": "Psych lab on empathy was thought-provoking"},
+        ],
+        "duke-noah": [
+            {"mood": "calm", "energy": 6, "stress": 3, "social": 5, "notes": "Yoga and journaling, non-negotiable daily routine"},
+            {"mood": "reflective", "energy": 5, "stress": 4, "social": 4, "notes": "Reading bell hooks, reconsidering vulnerability"},
+            {"mood": "happy", "energy": 7, "stress": 2, "social": 8, "notes": "Group processing session felt safe and honest"},
+            {"mood": "calm", "energy": 5, "stress": 3, "social": 3, "notes": "Sunset walk alone on campus, peaceful solitude"},
+        ],
+        "duke-ava": [
+            {"mood": "excited", "energy": 8, "stress": 4, "social": 9, "notes": "Justice panel had standing room only!"},
+            {"mood": "reflective", "energy": 6, "stress": 5, "social": 5, "notes": "Yoga teacher training challenging my boundaries concept"},
+            {"mood": "happy", "energy": 7, "stress": 3, "social": 7, "notes": "Spoken word performance was vulnerable but powerful"},
+            {"mood": "frustrated", "energy": 5, "stress": 7, "social": 6, "notes": "Institutional change is painfully slow"},
+        ],
+        "duke-isabella": [
+            {"mood": "happy", "energy": 7, "stress": 2, "social": 7, "notes": "Dance practice blending traditional and contemporary styles"},
+            {"mood": "reflective", "energy": 5, "stress": 4, "social": 6, "notes": "Long call with sister about processing emotions differently"},
+            {"mood": "calm", "energy": 6, "stress": 3, "social": 4, "notes": "Poetry workshop feedback was affirming"},
+            {"mood": "reflective", "energy": 4, "stress": 3, "social": 5, "notes": "Mindfulness group meditation — shared stillness"},
+            {"mood": "sad", "energy": 4, "stress": 5, "social": 3, "notes": "Nostalgic looking at old photos, feeling growth"},
+        ],
+        "duke-jackson": [
+            {"mood": "excited", "energy": 9, "stress": 4, "social": 8, "notes": "Five three-pointers in a row at practice!"},
+            {"mood": "happy", "energy": 8, "stress": 5, "social": 7, "notes": "Startup pitch got genuine interest from co-founders"},
+            {"mood": "calm", "energy": 6, "stress": 3, "social": 8, "notes": "Cooked Thai curry for roommates, kitchen was a mess but worth it"},
+            {"mood": "anxious", "energy": 7, "stress": 8, "social": 5, "notes": "Balancing basketball, classes, and startup is overwhelming"},
+            {"mood": "happy", "energy": 8, "stress": 3, "social": 9, "notes": "Great travel planning conversation with Mia"},
+        ],
+        "duke-mia": [
+            {"mood": "happy", "energy": 9, "stress": 2, "social": 5, "notes": "Runner's high after 6 miles, best natural antidepressant"},
+            {"mood": "reflective", "energy": 6, "stress": 3, "social": 4, "notes": "Photography walk capturing street art in Durham"},
+            {"mood": "excited", "energy": 8, "stress": 4, "social": 8, "notes": "Customer discovery interviews were humbling and energizing"},
+            {"mood": "calm", "energy": 7, "stress": 2, "social": 6, "notes": "Moroccan tagine cooking experiment was a success"},
+        ],
+        "duke-aiden": [
+            {"mood": "excited", "energy": 9, "stress": 5, "social": 9, "notes": "Made semifinals in basketball tournament, team chemistry is fire"},
+            {"mood": "happy", "energy": 6, "stress": 3, "social": 5, "notes": "Can play three guitar chords now, small progress"},
+            {"mood": "anxious", "energy": 7, "stress": 8, "social": 6, "notes": "Recruiting season pressure, every conversation feels like an interview"},
+            {"mood": "reflective", "energy": 6, "stress": 4, "social": 7, "notes": "Deep talk with Jackson about what success really means"},
+            {"mood": "calm", "energy": 5, "stress": 2, "social": 3, "notes": "Trail running in Duke Forest, trees restore perspective"},
+        ],
+        "duke-charlotte": [
+            {"mood": "calm", "energy": 5, "stress": 2, "social": 3, "notes": "Three hours with Marcus Aurelius, Stoic clarity"},
+            {"mood": "reflective", "energy": 4, "stress": 1, "social": 4, "notes": "Stargazing on the physics building roof, feeling small and okay"},
+            {"mood": "happy", "energy": 6, "stress": 3, "social": 5, "notes": "Watercolor of Duke Chapel feels honest, not perfect but meaningful"},
+            {"mood": "calm", "energy": 7, "stress": 1, "social": 4, "notes": "48-hour meditation retreat was transformative"},
+        ],
+        "duke-lucas": [
+            {"mood": "reflective", "energy": 5, "stress": 3, "social": 4, "notes": "Finished Dostoevsky, need to discuss the Grand Inquisitor"},
+            {"mood": "happy", "energy": 7, "stress": 2, "social": 6, "notes": "Saturn's rings through the telescope made me emotional"},
+            {"mood": "calm", "energy": 5, "stress": 3, "social": 5, "notes": "Good creative writing workshop feedback on parallel universe story"},
+            {"mood": "reflective", "energy": 4, "stress": 4, "social": 3, "notes": "Journaling about what I want life to feel like in 10 years"},
+            {"mood": "happy", "energy": 6, "stress": 1, "social": 3, "notes": "Fall colors on trail run were impossibly beautiful"},
+        ],
+        "duke-amelia": [
+            {"mood": "reflective", "energy": 5, "stress": 2, "social": 4, "notes": "Nasher Museum exhibit on Renaissance portraiture was captivating"},
+            {"mood": "calm", "energy": 4, "stress": 3, "social": 3, "notes": "Re-reading Virginia Woolf, discovering new layers"},
+            {"mood": "happy", "energy": 6, "stress": 2, "social": 5, "notes": "Journaling grandmother's stories before they fade"},
+            {"mood": "excited", "energy": 7, "stress": 3, "social": 6, "notes": "First time with oil paints — the depth compared to watercolors!"},
+        ],
+        "duke-harper": [
+            {"mood": "excited", "energy": 9, "stress": 5, "social": 9, "notes": "Full Act 2 run-through without stopping, electric energy"},
+            {"mood": "happy", "energy": 7, "stress": 6, "social": 8, "notes": "Sang at open mic, hands shaking but voice steady"},
+            {"mood": "reflective", "energy": 6, "stress": 3, "social": 4, "notes": "Durham hidden gardens photography project coming together"},
+            {"mood": "anxious", "energy": 8, "stress": 7, "social": 7, "notes": "Overwhelmed by commitments but also feeling alive"},
+            {"mood": "calm", "energy": 5, "stress": 4, "social": 6, "notes": "Weekend home reminded me how much I've changed"},
+        ],
+        "duke-mason": [
+            {"mood": "calm", "energy": 6, "stress": 4, "social": 4, "notes": "Lab spectroscopy is meditative in its precision"},
+            {"mood": "happy", "energy": 7, "stress": 2, "social": 5, "notes": "Eno River hike and leaf sample collection, nature meets science"},
+            {"mood": "reflective", "energy": 5, "stress": 3, "social": 3, "notes": "Meditation improving my focus during experiments"},
+            {"mood": "excited", "energy": 7, "stress": 4, "social": 5, "notes": "CRISPR paper rethinking my research direction"},
+        ],
+        "duke-ella": [
+            {"mood": "excited", "energy": 9, "stress": 4, "social": 7, "notes": "Sustainable fashion mood board is coming together beautifully"},
+            {"mood": "happy", "energy": 8, "stress": 2, "social": 8, "notes": "Spontaneous Blue Ridge road trip, golden light everywhere"},
+            {"mood": "calm", "energy": 7, "stress": 3, "social": 9, "notes": "Korean-Mexican fusion dinner was a hit with friends"},
+            {"mood": "excited", "energy": 9, "stress": 6, "social": 6, "notes": "End-of-semester energy surge, thriving under pressure"},
+            {"mood": "reflective", "energy": 5, "stress": 2, "social": 4, "notes": "Evening guitar practice, Fleetwood Mac feels grounding"},
+        ],
+        "duke-james": [
+            {"mood": "calm", "energy": 6, "stress": 1, "social": 2, "notes": "Six-hour trail hike, just footsteps and birdsong"},
+            {"mood": "reflective", "energy": 4, "stress": 3, "social": 3, "notes": "Thoreau's Walden questioning everything about modern life"},
+            {"mood": "happy", "energy": 5, "stress": 1, "social": 2, "notes": "Stargazing alone, identified three new constellations"},
+            {"mood": "calm", "energy": 6, "stress": 2, "social": 3, "notes": "Forest sunrise painting, impossible colors in nature"},
+            {"mood": "reflective", "energy": 5, "stress": 1, "social": 2, "notes": "Deep meditation session, 40 minutes felt like 10"},
+        ],
+        "duke-scarlett": [
+            {"mood": "happy", "energy": 8, "stress": 3, "social": 9, "notes": "40 students at campus cleanup, 200 lbs recycling collected!"},
+            {"mood": "excited", "energy": 9, "stress": 4, "social": 7, "notes": "Crossed half-marathon finish line crying happy tears"},
+            {"mood": "calm", "energy": 6, "stress": 3, "social": 7, "notes": "Taught composting to freshmen, their faces lighting up"},
+            {"mood": "anxious", "energy": 5, "stress": 7, "social": 5, "notes": "Climate anxiety weighing heavy today, channeling into action"},
+        ],
+        "duke-benjamin": [
+            {"mood": "excited", "energy": 9, "stress": 6, "social": 8, "notes": "Placed second in finance club competition, learned tons"},
+            {"mood": "happy", "energy": 8, "stress": 4, "social": 9, "notes": "Pickup basketball then food together, that's brotherhood"},
+            {"mood": "reflective", "energy": 7, "stress": 5, "social": 4, "notes": "Coding personal finance app, can't stop thinking about features"},
+            {"mood": "anxious", "energy": 6, "stress": 8, "social": 5, "notes": "15 internship applications, each rejection stings"},
+            {"mood": "happy", "energy": 8, "stress": 2, "social": 10, "notes": "Cooked mom's jollof rice for the whole floor, brought everyone out"},
+        ],
+    }
+
     for p in profiles:
         _demo_store["students"][p["id"]] = {
             "student_id": p["id"],
@@ -1281,7 +1623,31 @@ def _seed_demo_data():
         )
         _demo_store["twin_snapshots"][p["id"]] = twin
 
-    logger.info("Seeded %d Duke University demo students.", len(profiles))
+        # Seed journal entries (3-5 per student)
+        for j_text in _journal_bank.get(p["id"], []):
+            embedding = _demo_embed(j_text)
+            _demo_store["journal_entries"].append({
+                "student_id": p["id"],
+                "text": j_text,
+                "mood_label": None,
+                "tags": p["themes"][:3],
+                "embedding": embedding,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+
+        # Seed mood check-ins (3-5 per student)
+        for m in _mood_bank.get(p["id"], []):
+            _demo_store["mood_checkins"].append({
+                "student_id": p["id"],
+                "mood_label": m["mood"],
+                "energy_level": m["energy"],
+                "stress_level": m["stress"],
+                "social_battery": m["social"],
+                "notes": m.get("notes", ""),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+
+    logger.info("Seeded %d Duke University demo students with journal entries and mood data.", len(profiles))
 
 
 @app.on_event("startup")
@@ -1526,6 +1892,186 @@ async def get_twin(student_id: str = Query(...)):
 async def get_recommendations(student_id: str = Query(...), top_k: int = Query(10, ge=1, le=50)):
     """Return emotionally compatible peer recommendations (≥ 50 %)."""
     return MatchRetrievalChain.run(student_id, top_k)
+
+
+@app.get("/recommendations", response_model=list[PeerRecommendation], tags=["Matching"])
+async def get_recommendations(student_id: str = Query(...), top_k: int = Query(10, ge=1, le=50)):
+    """Return emotionally compatible peer recommendations (≥ 50 %)."""
+    return MatchRetrievalChain.run(student_id, top_k)
+
+
+class PreviewConversationPayload(BaseModel):
+    """Payload for POST /preview-conversation."""
+    student_id: str
+    peer_id: str
+
+
+class ConversationTurn(BaseModel):
+    speaker: str
+    text: str
+
+
+@app.post("/preview-conversation", tags=["Matching"])
+async def preview_conversation(payload: PreviewConversationPayload):
+    """
+    Generate a simulated digital-twin-to-twin preview conversation.
+    Two Cortex twins talk to each other using context from their profiles.
+    """
+    if DEMO_MODE:
+        me_twin = _demo_store["twin_snapshots"].get(payload.student_id)
+        peer_twin = _demo_store["twin_snapshots"].get(payload.peer_id)
+    else:
+        rows_me = _execute(_SQL_TWIN_BY_STUDENT, (payload.student_id,), fetch=True)
+        rows_peer = _execute(_SQL_TWIN_BY_STUDENT, (payload.peer_id,), fetch=True)
+        me_twin = _row_to_twin(rows_me[0]) if rows_me else None
+        peer_twin = _row_to_twin(rows_peer[0]) if rows_peer else None
+
+    if not me_twin or not peer_twin:
+        raise HTTPException(404, "Twin not found for one or both students.")
+
+    me_name = me_twin.display_name or "You"
+    peer_name = peer_twin.display_name or "Peer"
+    shared_themes = list(set(me_twin.top_themes) & set(peer_twin.top_themes))
+    shared_activities = list(set(me_twin.activity_preferences) & set(peer_twin.activity_preferences))
+    me_unique_themes = [t for t in me_twin.top_themes if t not in shared_themes][:2]
+    peer_unique_themes = [t for t in peer_twin.top_themes if t not in shared_themes][:2]
+
+    if not DEMO_MODE and ENABLE_CORTEX_EXPLANATIONS:
+        # Use Cortex COMPLETE for production conversation generation
+        prompt = f"""You are simulating a short, natural conversation between two college students meeting
+for the first time through a digital twin matching system. Generate exactly 6 turns (3 each).
+Keep it warm, authentic, and based on their actual interests.
+
+{me_name}'s profile: themes={json.dumps(me_twin.top_themes)}, emotions={json.dumps(me_twin.emotion_distribution)}, activities={json.dumps(me_twin.activity_preferences)}, values={json.dumps(me_twin.shared_values_tags)}
+{peer_name}'s profile: themes={json.dumps(peer_twin.top_themes)}, emotions={json.dumps(peer_twin.emotion_distribution)}, activities={json.dumps(peer_twin.activity_preferences)}, values={json.dumps(peer_twin.shared_values_tags)}
+
+Return JSON array: [{{"speaker": "name", "text": "message"}}, ...]
+"""
+        raw = cortex_complete(prompt)
+        try:
+            turns = json.loads(raw)
+            return {"conversation": turns}
+        except json.JSONDecodeError:
+            pass  # Fall through to demo generation
+
+    # --- Demo / fallback conversation generator ---
+    random.seed(hash(payload.student_id + payload.peer_id))
+
+    # Build conversation templates based on actual profile overlap
+    conversation: list[dict[str, str]] = []
+
+    # Turn 1: Peer twin opens with something about a shared interest
+    if shared_themes:
+        t = random.choice(shared_themes)
+        openers = [
+            f"Hey {me_name}! I saw we're both into {t} — that's actually a big part of my week. How'd you get into it?",
+            f"Hi {me_name}! I noticed {t} came up as something we both care about. What does that look like for you day to day?",
+            f"Hey! So we both seem drawn to {t}. I've been really deep into it lately — what's your experience been like?",
+        ]
+    elif shared_activities:
+        a = random.choice(shared_activities)
+        openers = [
+            f"Hey {me_name}! Looks like we're both into {a} — I'd love to hear about your experience with it.",
+            f"Hi! I noticed we both do {a}. It's low-key one of my favorite things. How often do you get to do it?",
+        ]
+    else:
+        openers = [
+            f"Hey {me_name}! Our twins flagged us as a good match — I'm curious what you're into these days.",
+            f"Hi {me_name}! The compatibility analysis says we'd vibe — tell me what you're passionate about!",
+        ]
+    conversation.append({"speaker": peer_name, "text": random.choice(openers)})
+
+    # Turn 2: Me twin responds with personal context
+    if shared_themes:
+        t = shared_themes[0]
+        me_responses = [
+            f"Oh nice, {peer_name}! Yeah {t} is huge for me — I actually got into it freshman year and it's kind of shaped how I see everything now. What aspect of it resonates most with you?",
+            f"Hey {peer_name}! {t.capitalize()} is literally my thing. I think about it all the time honestly. What drew you to it?",
+            f"That's awesome! I've been exploring {t} from a few different angles. It connects to a lot of other stuff I care about like {', '.join(me_unique_themes[:2]) if me_unique_themes else 'personal growth'}.",
+        ]
+    else:
+        me_responses = [
+            f"Hey {peer_name}! I've been really into {me_twin.top_themes[0] if me_twin.top_themes else 'a lot of different things'} lately. It's been a journey. What about you?",
+            f"Hi! Honestly I'm in one of those phases where everything feels connected. {me_twin.top_themes[0].capitalize() if me_twin.top_themes else 'Life'} has been on my mind a lot.",
+        ]
+    conversation.append({"speaker": me_name, "text": random.choice(me_responses)})
+
+    # Turn 3: Peer shares something deeper
+    me_emo = sorted(me_twin.emotion_distribution.items(), key=lambda x: x[1], reverse=True)
+    peer_emo = sorted(peer_twin.emotion_distribution.items(), key=lambda x: x[1], reverse=True)
+    peer_top_emo = peer_emo[0][0] if peer_emo else "curiosity"
+    if peer_unique_themes:
+        deeper = [
+            f"That's really cool. For me it also ties into my interest in {peer_unique_themes[0]}. I feel like {peer_top_emo} drives a lot of what I do — like I'm always chasing that feeling of discovery, you know?",
+            f"I love that. I think what connects it for me is this sense of {peer_top_emo}. Lately I've also been exploring {peer_unique_themes[0]} and it's opened up a whole new way of thinking.",
+        ]
+    else:
+        deeper = [
+            f"Totally get that. For me, I think {peer_top_emo} is what drives most of my choices. Even when things get stressful, that core motivation keeps me going.",
+            f"I feel that. Something I've realized is that {peer_top_emo} is basically my compass. When I lean into it, everything else falls into place.",
+        ]
+    conversation.append({"speaker": peer_name, "text": random.choice(deeper)})
+
+    # Turn 4: Me twin connects emotionally
+    me_top_emo = me_emo[0][0] if me_emo else "curiosity"
+    shared_vals = list(set(me_twin.shared_values_tags) & set(peer_twin.shared_values_tags))
+    if shared_vals:
+        emotional = [
+            f"I really relate to that. I think {me_top_emo} is my version of the same thing. And we both value {shared_vals[0]} — I feel like that's rare to find in someone. Most people don't think about that stuff.",
+            f"Wow, yeah. It sounds like we process things similarly even if we come at it from different angles. The fact that we both care about {shared_vals[0]} says a lot.",
+        ]
+    else:
+        emotional = [
+            f"I really relate to that. For me it's more of a {me_top_emo} thing, but I think the underlying drive is similar. It's cool to meet someone who thinks about life at this level.",
+            f"Honestly hearing you say that is validating. I come at it from a {me_top_emo} place but there's definitely overlap in how we see the world.",
+        ]
+    conversation.append({"speaker": me_name, "text": random.choice(emotional)})
+
+    # Turn 5: Peer suggests doing something together
+    if shared_activities:
+        a = random.choice(shared_activities)
+        # Make the activity phrasing sound natural
+        activity_verb = {
+            "reading": "do a book swap or read together at a café",
+            "coding": "code together or do a project",
+            "yoga": "do yoga together",
+            "trail running": "go for a trail run together",
+            "journaling": "do a journaling session together",
+            "cooking": "cook something together",
+            "painting": "do a painting session together",
+            "stargazing": "go stargazing together",
+            "volunteering": "volunteer together",
+            "dance": "hit a dance class together",
+            "guitar": "jam together",
+            "basketball": "shoot hoops together",
+            "gaming": "game together sometime",
+        }.get(a, f"do some {a} together")
+        together = [
+            f"We should definitely hang out! Maybe we could {activity_verb}? I feel like the conversation would be just as good as this one, haha.",
+            f"Okay I'm convinced we'd be great friends. Want to {activity_verb} this week? I have a feeling it would turn into a 3-hour conversation.",
+        ]
+    elif shared_themes:
+        t = random.choice(shared_themes)
+        together = [
+            f"I feel like we could talk about {t} for hours. Want to grab coffee and continue this for real?",
+            f"This has been so good. We should totally meet up and nerd out about {t} in person.",
+        ]
+    else:
+        together = [
+            f"I feel like we'd have great conversations in person. Want to grab coffee sometime this week?",
+            f"This is really refreshing. We should definitely meet up — I feel like there's a lot more to explore here.",
+        ]
+    conversation.append({"speaker": peer_name, "text": random.choice(together)})
+
+    # Turn 6: Me twin wraps up warmly
+    closings = [
+        f"I'd love that! It's honestly rare to find someone who gets it like this. Let's make it happen. 😊",
+        f"Absolutely, I'm in! This conversation already made my day. Looking forward to it!",
+        f"100% yes. I had a feeling we'd click and this just confirmed it. Let's do it!",
+    ]
+    conversation.append({"speaker": me_name, "text": random.choice(closings)})
+
+    return {"conversation": conversation}
 
 
 @app.post("/feedback", tags=["Social"])
