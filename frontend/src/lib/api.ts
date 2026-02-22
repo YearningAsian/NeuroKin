@@ -1,6 +1,18 @@
-// NeuroTwin API client
+/**
+ * NeuroTwin API Client
+ *
+ * Centralised HTTP client for all backend communication.
+ * Every function corresponds to a single REST endpoint on the FastAPI backend.
+ * All responses are type-safe via generics and Pydantic-aligned interfaces.
+ *
+ * @module api
+ */
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+/**
+ * Parse a fetch Response, throwing a descriptive error on non-2xx status.
+ */
 async function parseResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const payload = await res.text();
@@ -11,12 +23,14 @@ async function parseResponse<T>(res: Response): Promise<T> {
 
 // --- Auth ---
 
+/** Server response after signup or login. */
 export interface AuthResponse {
   status: string;
   student_id: string;
   display_name: string;
 }
 
+/** Create a new student account and return session info. */
 export async function signup(studentId: string, displayName: string, password: string, school: string = ""): Promise<AuthResponse> {
   const res = await fetch(`${API_BASE}/signup`, {
     method: "POST",
@@ -26,6 +40,7 @@ export async function signup(studentId: string, displayName: string, password: s
   return parseResponse(res);
 }
 
+/** Authenticate an existing student. */
 export async function login(studentId: string, password: string): Promise<AuthResponse> {
   const res = await fetch(`${API_BASE}/login`, {
     method: "POST",
@@ -35,6 +50,7 @@ export async function login(studentId: string, password: string): Promise<AuthRe
   return parseResponse(res);
 }
 
+/** Payload shape for creating a journal entry. */
 export interface JournalEntry {
   student_id: string;
   text: string;
@@ -51,6 +67,7 @@ export interface MoodCheckIn {
   notes?: string;
 }
 
+/** The Emotional Digital Twin snapshot returned by the backend. */
 export interface TwinSnapshot {
   student_id: string;
   display_name: string;
@@ -64,6 +81,7 @@ export interface TwinSnapshot {
   last_updated: string;
 }
 
+/** A recommended peer with compatibility score and icebreaker. */
 export interface PeerRecommendation {
   peer_id: string;
   display_name: string;

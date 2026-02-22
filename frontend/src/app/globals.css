@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* ─── Design Tokens ─── */
 :root {
   --color-primary: #f9a825;
   --color-primary-light: #fff3c4;
@@ -20,6 +21,7 @@
   --radius-full: 9999px;
 }
 
+/* ─── Base ─── */
 html {
   scroll-behavior: smooth;
 }
@@ -28,6 +30,48 @@ body {
   font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
   color: var(--color-text);
   background: var(--color-surface);
+}
+
+/* ─── Accessibility ─── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Visible on focus for skip links */
+.focus\:not-sr-only:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: revert;
+  margin: revert;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* Focus ring for interactive elements */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Headspace-inspired soft background blobs */

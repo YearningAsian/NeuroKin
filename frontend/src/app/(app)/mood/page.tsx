@@ -111,6 +111,7 @@ export default function MoodPage() {
               max={10}
               value={energy}
               onChange={(e) => setEnergy(Number(e.target.value))}
+              aria-label={`Energy level: ${energy} out of 10`}
               className="w-full accent-amber-500 h-2"
             />
             <div className="flex justify-between text-xs text-[var(--color-text-muted)] mt-1">
@@ -132,6 +133,7 @@ export default function MoodPage() {
               max={10}
               value={stress}
               onChange={(e) => setStress(Number(e.target.value))}
+              aria-label={`Stress level: ${stress} out of 10`}
               className="w-full accent-red-500 h-2"
             />
             <div className="flex justify-between text-xs text-[var(--color-text-muted)] mt-1">
@@ -153,6 +155,7 @@ export default function MoodPage() {
               max={10}
               value={social}
               onChange={(e) => setSocial(Number(e.target.value))}
+              aria-label={`Social battery: ${social} out of 10`}
               className="w-full accent-blue-500 h-2"
             />
             <div className="flex justify-between text-xs text-[var(--color-text-muted)] mt-1">

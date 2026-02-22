@@ -276,6 +276,7 @@ export default function OnboardingPage() {
             max={10}
             value={energyLevel}
             onChange={(e) => setEnergyLevel(Number(e.target.value))}
+            aria-label={`Energy level: ${energyLevel} out of 10`}
             className="w-full accent-[var(--color-primary)] h-2 rounded-full"
           />
           <div className="flex justify-between text-xs text-[var(--color-text-muted)] mt-1">
@@ -294,6 +295,7 @@ export default function OnboardingPage() {
             max={10}
             value={socialBattery}
             onChange={(e) => setSocialBattery(Number(e.target.value))}
+            aria-label={`Social battery: ${socialBattery} out of 10`}
             className="w-full accent-[var(--color-accent)] h-2 rounded-full"
           />
           <div className="flex justify-between text-xs text-[var(--color-text-muted)] mt-1">

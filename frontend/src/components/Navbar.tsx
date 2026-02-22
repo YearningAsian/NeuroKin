@@ -37,7 +37,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-[var(--color-border)]">
+    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-[var(--color-border)]" aria-label="Main navigation">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 group">
@@ -87,6 +87,8 @@ export default function Navbar() {
         <button
           onClick={() => setOpen(!open)}
           className="md:hidden p-2 rounded-lg hover:bg-slate-100"
+          aria-expanded={open}
+          aria-label={open ? "Close navigation menu" : "Open navigation menu"}
         >
           {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>

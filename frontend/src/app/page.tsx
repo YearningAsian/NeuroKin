@@ -519,7 +519,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-white">
+    <main id="main-content" className="min-h-screen bg-white">
       {/* ──── HEADER ──── */}
       <motion.header
         className="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-xl border-b border-slate-100/60"
@@ -988,7 +988,7 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════ FOOTER ═══════════════ */}
-      <footer className="py-12 border-t border-slate-100">
+      <footer className="py-12 border-t border-slate-100" role="contentinfo">
         <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-warm)] flex items-center justify-center">

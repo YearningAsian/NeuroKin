@@ -1,4 +1,12 @@
-// Connection & chat state management (localStorage-backed)
+/**
+ * Connection & Chat State Management
+ *
+ * Manages peer connections and twin-to-twin chat messages using localStorage.
+ * Each student's connections are stored under a unique key so multiple
+ * demo accounts can coexist in the same browser.
+ *
+ * @module connections
+ */
 
 export interface ChatMessage {
   id: string;
