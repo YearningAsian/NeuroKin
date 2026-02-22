@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   Brain,
@@ -10,9 +11,11 @@ import {
   User,
   Menu,
   X,
+  LogOut,
 } from "lucide-react";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard", icon: Brain },
@@ -25,9 +28,16 @@ const navLinks = [
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { user, logout } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-[var(--color-border)]">
+    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-[var(--color-border)]" aria-label="Main navigation">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 group">
@@ -35,7 +45,7 @@ export default function Navbar() {
             <Brain className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl font-bold text-[var(--color-text)]">
-            Neuro<span className="text-[var(--color-primary)]">Kin</span>
+            Neuro<span className="text-[var(--color-primary)]">Twin</span>
           </span>
         </Link>
 
@@ -60,12 +70,25 @@ export default function Navbar() {
               </Link>
             );
           })}
+          {/* Logout button */}
+          {user && (
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-[var(--color-text-muted)] hover:text-red-600 hover:bg-red-50 transition-colors ml-2"
+              title={`Logged in as ${user.displayName}`}
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden lg:inline">Log out</span>
+            </button>
+          )}
         </div>
 
         {/* Mobile toggle */}
         <button
           onClick={() => setOpen(!open)}
           className="md:hidden p-2 rounded-lg hover:bg-slate-100"
+          aria-expanded={open}
+          aria-label={open ? "Close navigation menu" : "Open navigation menu"}
         >
           {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
@@ -94,6 +117,15 @@ export default function Navbar() {
               </Link>
             );
           })}
+          {user && (
+            <button
+              onClick={() => { setOpen(false); handleLogout(); }}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-colors w-full mt-2"
+            >
+              <LogOut className="w-5 h-5" />
+              Log out ({user.displayName})
+            </button>
+          )}
         </div>
       )}
     </nav>

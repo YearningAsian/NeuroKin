@@ -3,8 +3,12 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { SmilePlus, Send, Sparkles } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Toast } from "@/components/ui/Toast";
+import { SmilePlus, Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { submitMood } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 const moods = [
   { emoji: "😊", label: "Happy", color: "bg-amber-100 border-amber-300 hover:bg-amber-200" },
@@ -18,37 +22,52 @@ const moods = [
 ];
 
 export default function MoodPage() {
+  const { user } = useAuth();
+  const studentId = user?.studentId ?? "";
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [energy, setEnergy] = useState(5);
   const [stress, setStress] = useState(5);
   const [social, setSocial] = useState(5);
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
-    if (!selectedMood) return;
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      setSelectedMood(null);
-      setEnergy(5);
-      setStress(5);
-      setSocial(5);
-      setNotes("");
-    }, 3000);
+  const handleSubmit = async () => {
+    if (!selectedMood || submitting) return;
+    setSubmitting(true);
+    try {
+      await submitMood({
+        student_id: studentId,
+        mood_label: selectedMood.toLowerCase(),
+        energy_level: energy,
+        stress_level: stress,
+        social_battery: social,
+        notes: notes || undefined,
+      });
+      setSubmitted(true);
+      setTimeout(() => {
+        setSubmitted(false);
+        setSelectedMood(null);
+        setEnergy(5);
+        setStress(5);
+        setSocial(5);
+        setNotes("");
+      }, 3000);
+    } catch (err) {
+      console.error("Mood submit failed:", err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-8">
-      <div className="animate-fade-in-up">
-        <h1 className="text-2xl md:text-3xl font-extrabold flex items-center gap-3">
-          <SmilePlus className="w-8 h-8 text-emerald-500" />
-          Mood Check-in
-        </h1>
-        <p className="text-[var(--color-text-muted)] mt-1">
-          How are you feeling? This updates your Emotional Twin in real time.
-        </p>
-      </div>
+      <PageHeader
+        icon={SmilePlus}
+        iconColor="text-emerald-500"
+        title="Mood Check-in"
+        description="How are you feeling? This updates your Emotional Twin in real time."
+      />
 
       {/* Mood selection */}
       <Card className="animate-fade-in-up">
@@ -92,6 +111,7 @@ export default function MoodPage() {
               max={10}
               value={energy}
               onChange={(e) => setEnergy(Number(e.target.value))}
+              aria-label={`Energy level: ${energy} out of 10`}
               className="w-full accent-amber-500 h-2"
             />
             <div className="flex justify-between text-xs text-[var(--color-text-muted)] mt-1">
@@ -113,6 +133,7 @@ export default function MoodPage() {
               max={10}
               value={stress}
               onChange={(e) => setStress(Number(e.target.value))}
+              aria-label={`Stress level: ${stress} out of 10`}
               className="w-full accent-red-500 h-2"
             />
             <div className="flex justify-between text-xs text-[var(--color-text-muted)] mt-1">
@@ -134,6 +155,7 @@ export default function MoodPage() {
               max={10}
               value={social}
               onChange={(e) => setSocial(Number(e.target.value))}
+              aria-label={`Social battery: ${social} out of 10`}
               className="w-full accent-blue-500 h-2"
             />
             <div className="flex justify-between text-xs text-[var(--color-text-muted)] mt-1">
@@ -159,18 +181,17 @@ export default function MoodPage() {
 
       {/* Submit */}
       <div className="flex justify-end animate-fade-in-up">
-        <Button onClick={handleSubmit} disabled={!selectedMood} size="lg">
-          <Send className="w-4 h-4" />
-          Submit Check-in
+        <Button onClick={handleSubmit} disabled={!selectedMood || submitting} size="lg">
+          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          {submitting ? "Submitting..." : "Submit Check-in"}
         </Button>
       </div>
 
-      {submitted && (
-        <div className="fixed bottom-6 right-6 bg-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-fade-in-up z-50">
-          <Sparkles className="w-5 h-5" />
-          Mood recorded! Your Twin has been updated.
-        </div>
-      )}
+      <Toast
+        message="Mood recorded! Your Twin has been updated."
+        visible={submitted}
+        onDismiss={() => setSubmitted(false)}
+      />
     </div>
   );
 }
