@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -69,28 +69,9 @@ export default function JournalPage() {
   const [entriesLimit, setEntriesLimit] = useState(5);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const suggestionsRef = useRef<HTMLDivElement | null>(null);
   const speechSupported =
     typeof window !== "undefined" &&
     !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-
-  useEffect(() => {
-    const container = suggestionsRef.current;
-    if (!container) return;
-
-    const interval = window.setInterval(() => {
-      if (!container) return;
-      const maxScrollLeft = container.scrollWidth - container.clientWidth;
-      if (maxScrollLeft <= 0) return;
-      if (container.scrollLeft >= maxScrollLeft - 1) {
-        container.scrollTo({ left: 0, behavior: "smooth" });
-      } else {
-        container.scrollBy({ left: 1, behavior: "auto" });
-      }
-    }, 25);
-
-    return () => window.clearInterval(interval);
-  }, []);
 
   const fetcher = useCallback(
     () => getJournalEntries(studentId, entriesLimit),
@@ -158,16 +139,31 @@ export default function JournalPage() {
         <p className="text-sm font-medium text-[var(--color-text-muted)] mb-3">
           Suggestions:
         </p>
-        <div ref={suggestionsRef} className="overflow-x-auto scrollbar-none pb-1">
-          <div className="inline-flex gap-2">
-            {[...prompts, ...prompts].map((p, idx) => (
-              <div
-                key={`${p}-${idx}`}
-                className="flex-shrink-0 w-[48%] min-w-[200px] md:w-[48%] md:min-w-[220px] sm:w-[90%] bg-white border rounded-lg p-4 shadow text-sm text-[var(--color-text)]"
-              >
-                {p}
-              </div>
-            ))}
+        <div
+          className="overflow-hidden select-none pointer-events-none"
+          style={{ maskImage: "linear-gradient(to right, transparent, black 4%, black 96%, transparent)" }}
+        >
+          <div className="flex w-max animate-marquee" style={{ ["--marquee-duration" as string]: "40s" }}>
+            <div className="flex gap-3 shrink-0 pr-3">
+              {prompts.map((p) => (
+                <div
+                  key={p}
+                  className="text-sm px-4 py-2 rounded-full border border-[var(--color-border)] text-[var(--color-text-muted)] bg-white/70 whitespace-nowrap"
+                >
+                  {p}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 shrink-0 pr-3" aria-hidden>
+              {prompts.map((p) => (
+                <div
+                  key={`dup-${p}`}
+                  className="text-sm px-4 py-2 rounded-full border border-[var(--color-border)] text-[var(--color-text-muted)] bg-white/70 whitespace-nowrap"
+                >
+                  {p}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

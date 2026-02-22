@@ -347,6 +347,7 @@ class SignupPayload(BaseModel):
     student_id: str = Field(..., min_length=3, max_length=64, description="Unique username")
     display_name: str = Field(..., min_length=1, max_length=128)
     password: str = Field(..., min_length=4, max_length=128)
+    school: str = Field("", max_length=256, description="Selected school / university")
 
 
 class LoginPayload(BaseModel):
@@ -1601,6 +1602,7 @@ async def signup(payload: SignupPayload):
             "student_id": payload.student_id,
             "display_name": payload.display_name,
             "password_hash": pw_hash,
+            "school": payload.school,
             "onboarded": False,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -1644,20 +1646,20 @@ async def signup(payload: SignupPayload):
         try:
             _execute(
                 """
-                INSERT INTO students (student_id, display_name, email_hash, password_hash, onboarded)
-                VALUES (%s, %s, '', %s, FALSE)
+                INSERT INTO students (student_id, display_name, email_hash, password_hash, school, onboarded)
+                VALUES (%s, %s, '', %s, %s, FALSE)
                 """,
-                (payload.student_id, payload.display_name, pw_hash),
+                (payload.student_id, payload.display_name, pw_hash, payload.school),
             )
         except Exception as exc:
             if "PASSWORD_HASH" in str(exc).upper() and "INVALID IDENTIFIER" in str(exc).upper():
                 _ensure_auth_columns()
                 _execute(
                     """
-                    INSERT INTO students (student_id, display_name, email_hash, onboarded)
-                    VALUES (%s, %s, %s, FALSE)
+                    INSERT INTO students (student_id, display_name, email_hash, school, onboarded)
+                    VALUES (%s, %s, %s, %s, FALSE)
                     """,
-                    (payload.student_id, payload.display_name, pw_hash),
+                    (payload.student_id, payload.display_name, pw_hash, payload.school),
                 )
             else:
                 raise

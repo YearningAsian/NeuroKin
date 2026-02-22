@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS students (
     display_name   VARCHAR(128),
     email_hash     VARCHAR(128),
     password_hash  VARCHAR(128),
+    school         VARCHAR(256),
     onboarded      BOOLEAN       DEFAULT FALSE,
     created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
     updated_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()

@@ -17,11 +17,11 @@ export interface AuthResponse {
   display_name: string;
 }
 
-export async function signup(studentId: string, displayName: string, password: string): Promise<AuthResponse> {
+export async function signup(studentId: string, displayName: string, password: string, school: string = ""): Promise<AuthResponse> {
   const res = await fetch(`${API_BASE}/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ student_id: studentId, display_name: displayName, password }),
+    body: JSON.stringify({ student_id: studentId, display_name: displayName, password, school }),
   });
   return parseResponse(res);
 }

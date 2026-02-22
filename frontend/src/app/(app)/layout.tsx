@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import ChatWidget from "@/components/ChatWidget";
 import { useAuth } from "@/lib/auth";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -31,6 +32,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-[var(--color-surface-soft)]">
       <Navbar />
       <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
+      <ChatWidget />
     </div>
   );
 }

@@ -19,10 +19,13 @@ import {
   Heart,
   Users,
   Loader2,
+  Search,
+  GraduationCap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { submitJournal, submitMood, signup } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { US_SCHOOLS } from "@/lib/schools";
 
 const moodOptions = [
   { emoji: "😊", label: "Happy", color: "bg-amber-100 border-amber-300" },
@@ -71,6 +74,14 @@ export default function OnboardingPage() {
   const [selectedValues, setSelectedValues] = useState<string[]>([]);
   const [journalText, setJournalText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [selectedSchool, setSelectedSchool] = useState("");
+  const [schoolSearch, setSchoolSearch] = useState("");
+
+  const filteredSchools = schoolSearch.trim()
+    ? US_SCHOOLS.filter((s) =>
+        s.toLowerCase().includes(schoolSearch.toLowerCase())
+      ).slice(0, 50)
+    : US_SCHOOLS.slice(0, 50);
 
   const toggleActivity = (label: string) => {
     setSelectedActivities((prev) =>
@@ -147,7 +158,82 @@ export default function OnboardingPage() {
       </div>
     </div>,
 
-    // Step 2: Current mood
+    // Step 2: School selection
+    <div key="school" className="animate-fade-in-up max-w-md mx-auto">
+      <GraduationCap className="w-10 h-10 text-[var(--color-primary)] mb-4" />
+      <h2 className="text-2xl font-bold mb-2">Select your school</h2>
+      <p className="text-[var(--color-text-muted)] text-sm mb-6">
+        Find your college or university to join your campus community.
+      </p>
+      <div className="relative mb-4">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-muted)]" />
+        <input
+          type="text"
+          value={schoolSearch}
+          onChange={(e) => setSchoolSearch(e.target.value)}
+          placeholder="Search schools…"
+          className="w-full pl-11 pr-5 py-3 rounded-xl border border-[var(--color-border)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+        />
+      </div>
+      {selectedSchool && (
+        <div className="mb-3 px-4 py-2 rounded-xl bg-[var(--color-primary-light)] border border-[var(--color-primary)] text-sm font-medium flex items-center justify-between">
+          <span>{selectedSchool}</span>
+          <button
+            onClick={() => setSelectedSchool("")}
+            className="text-[var(--color-primary)] hover:text-red-500 ml-2 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+      <div className="max-h-64 overflow-y-auto rounded-xl border border-[var(--color-border)] divide-y divide-[var(--color-border)]">
+        {filteredSchools.length === 0 ? (
+          <div className="p-4 text-center text-sm text-[var(--color-text-muted)]">
+            No schools match &quot;{schoolSearch}&quot;
+          </div>
+        ) : (
+          filteredSchools.map((school) => (
+            <button
+              key={school}
+              onClick={() => {
+                setSelectedSchool(school);
+                setSchoolSearch("");
+              }}
+              className={cn(
+                "w-full text-left px-4 py-3 text-sm transition-colors",
+                selectedSchool === school
+                  ? "bg-[var(--color-primary-light)] text-[var(--color-primary)] font-semibold"
+                  : "hover:bg-slate-50"
+              )}
+            >
+              {school}
+            </button>
+          ))
+        )}
+      </div>
+      <p className="text-xs text-[var(--color-text-muted)] mt-3">
+        {US_SCHOOLS.length} schools available • scroll or type to filter
+      </p>
+    </div>,
+
+    // Step 3: Welcome to school community
+    <div key="welcome-school" className="text-center animate-fade-in-up">
+      <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-emerald-500 flex items-center justify-center">
+        <GraduationCap className="w-10 h-10 text-white" />
+      </div>
+      <h1 className="text-3xl font-extrabold mb-3">
+        Welcome to the {selectedSchool || "your school"} community!
+      </h1>
+      <p className="text-[var(--color-text-muted)] max-w-md mx-auto mb-2 leading-relaxed">
+        You&apos;re joining a campus network of students who share meaningful
+        connections through their Emotional Digital Twins.
+      </p>
+      <p className="text-sm text-emerald-600 font-medium">
+        🎓 Let&apos;s finish setting up your twin profile
+      </p>
+    </div>,
+
+    // Step 4: Current mood
     <div key="mood" className="animate-fade-in-up max-w-lg mx-auto">
       <h2 className="text-2xl font-bold mb-2">How are you feeling right now?</h2>
       <p className="text-[var(--color-text-muted)] text-sm mb-6">
@@ -172,7 +258,7 @@ export default function OnboardingPage() {
       </div>
     </div>,
 
-    // Step 3: Energy & Social
+    // Step 5: Energy & Social
     <div key="energy" className="animate-fade-in-up max-w-md mx-auto">
       <h2 className="text-2xl font-bold mb-2">Your energy levels</h2>
       <p className="text-[var(--color-text-muted)] text-sm mb-8">
@@ -218,7 +304,7 @@ export default function OnboardingPage() {
       </div>
     </div>,
 
-    // Step 4: Activities
+    // Step 6: Activities
     <div key="activities" className="animate-fade-in-up max-w-lg mx-auto">
       <h2 className="text-2xl font-bold mb-2">What do you enjoy?</h2>
       <p className="text-[var(--color-text-muted)] text-sm mb-6">
@@ -247,7 +333,7 @@ export default function OnboardingPage() {
       </div>
     </div>,
 
-    // Step 5: Values
+    // Step 7: Values
     <div key="values" className="animate-fade-in-up max-w-lg mx-auto">
       <h2 className="text-2xl font-bold mb-2">What do you value most?</h2>
       <p className="text-[var(--color-text-muted)] text-sm mb-6">
@@ -275,7 +361,7 @@ export default function OnboardingPage() {
       </div>
     </div>,
 
-    // Step 6: First journal entry
+    // Step 8: First journal entry
     <div key="journal" className="animate-fade-in-up max-w-lg mx-auto">
       <BookHeart className="w-10 h-10 text-[var(--color-warm)] mb-4" />
       <h2 className="text-2xl font-bold mb-2">Your first journal entry</h2>
@@ -295,7 +381,7 @@ export default function OnboardingPage() {
       </p>
     </div>,
 
-    // Step 7: Done
+    // Step 9: Done
     <div key="done" className="text-center animate-fade-in-up">
       <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center">
         <Sparkles className="w-10 h-10 text-white" />
@@ -325,7 +411,7 @@ export default function OnboardingPage() {
     setSubmitting(true);
     try {
       // Create the account first
-      const result = await signup(username, name, password);
+      const result = await signup(username, name, password, selectedSchool);
       authLogin(result.student_id, result.display_name);
 
       // Submit initial mood + journal under the new account
@@ -368,6 +454,11 @@ export default function OnboardingPage() {
         return;
       }
       setSignupError("");
+    }
+    // Validate school step
+    if (step === 2 && !selectedSchool) {
+      setSignupError("Please select your school to continue.");
+      return;
     }
     if (step === totalSteps - 2) {
       finishOnboarding();
