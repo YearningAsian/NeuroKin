@@ -28,6 +28,7 @@ export interface AuthResponse {
   status: string;
   student_id: string;
   display_name: string;
+  school?: string;
 }
 
 /** Create a new student account and return session info. */
@@ -204,6 +205,25 @@ export async function submitActivity(
       description,
       duration_mins: durationMins,
     }),
+  });
+  return parseResponse(res);
+}
+
+// --- Preview Conversation ---
+
+export interface ConversationTurn {
+  speaker: string;
+  text: string;
+}
+
+export async function previewConversation(
+  studentId: string,
+  peerId: string,
+): Promise<{ conversation: ConversationTurn[] }> {
+  const res = await fetch(`${API_BASE}/preview-conversation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ student_id: studentId, peer_id: peerId }),
   });
   return parseResponse(res);
 }

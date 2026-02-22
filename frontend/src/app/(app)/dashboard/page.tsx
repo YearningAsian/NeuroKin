@@ -13,6 +13,7 @@ import {
   Users,
   TrendingUp,
   Brain,
+  School,
   Sparkles,
   ArrowRight,
 } from "lucide-react";
@@ -66,6 +67,7 @@ export default function DashboardPage() {
   const currentMoodLabel = latestMood
     ? latestMood.mood_label.charAt(0).toUpperCase() + latestMood.mood_label.slice(1)
     : "No check-in yet";
+  const communitySchool = user?.school || (studentId.startsWith("duke-") ? "Duke University" : "");
 
   if (twinLoading) return <LoadingSpinner />;
 
@@ -79,6 +81,13 @@ export default function DashboardPage() {
         <p className="text-[var(--color-text-muted)] mt-1">
           Your Emotional Twin is active. Here&apos;s your overview.
         </p>
+        {communitySchool && (
+          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--color-border)] bg-white text-xs text-[var(--color-text-muted)]">
+            <School className="w-3.5 h-3.5" />
+            <span className="font-medium">Community:</span>
+            <span>{communitySchool}</span>
+          </div>
+        )}
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">

@@ -9,12 +9,12 @@ import { login, signup } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 const DEMO_ACCOUNTS = [
-  { id: "demo-alex", name: "Alex", description: "Curious, creative, into AI & music" },
-  { id: "demo-jordan", name: "Jordan", description: "Empathetic writer, yoga & mindfulness" },
-  { id: "demo-sam", name: "Sam", description: "Energetic, entrepreneurial, sports & cooking" },
-  { id: "demo-riley", name: "Riley", description: "Calm, scholarly, astronomy & meditation" },
-  { id: "demo-casey", name: "Casey", description: "Determined techie, gaming & robotics" },
-  { id: "demo-morgan", name: "Morgan", description: "Compassionate activist, dance & poetry" },
+  { id: "duke-emma", name: "Emma", description: "AI builder, runner, guitarist" },
+  { id: "duke-liam", name: "Liam", description: "Robotics + RL enthusiast" },
+  { id: "duke-olivia", name: "Olivia", description: "Poetry, dance, mindfulness" },
+  { id: "duke-jackson", name: "Jackson", description: "Startup + basketball energy" },
+  { id: "duke-charlotte", name: "Charlotte", description: "Philosophy, stargazing, art" },
+  { id: "duke-scarlett", name: "Scarlett", description: "Sustainability + community" },
 ];
 
 export default function LoginPage() {
@@ -36,7 +36,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       const result = await login(uid, pass);
-      authLogin(result.student_id, result.display_name);
+      authLogin(result.student_id, result.display_name, result.school);
       router.push("/dashboard");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Login failed";
@@ -67,7 +67,7 @@ export default function LoginPage() {
 
     try {
       const result = await login(accountId, "demo");
-      authLogin(result.student_id, result.display_name);
+      authLogin(result.student_id, result.display_name, result.school);
       router.push("/dashboard");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Login failed";
@@ -128,7 +128,7 @@ export default function LoginPage() {
                   type="text"
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value)}
-                  placeholder="e.g. demo-alex"
+                  placeholder="e.g. duke-emma"
                   className="w-full px-4 py-2.5 rounded-xl border border-[var(--color-border)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                 />

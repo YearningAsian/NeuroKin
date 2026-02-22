@@ -90,13 +90,7 @@ export function getInitialMessage(
   peerName: string,
   icebreaker: string,
 ): ChatMessage[] {
-  return [
-    {
-      id: `twin-${Date.now()}`,
-      sender: "peer_twin",
-      senderName: peerName,
-      text: icebreaker || `Hi ${userName}! Based on our profiles, we might get along.`,
-      timestamp: new Date().toISOString(),
-    },
-  ];
+  // Don't auto-send any messages — the icebreaker is displayed
+  // on the recommendation card and the user can choose to send it.
+  return [];
 }
