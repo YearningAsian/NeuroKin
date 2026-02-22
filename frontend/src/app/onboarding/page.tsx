@@ -414,7 +414,7 @@ export default function OnboardingPage() {
     try {
       // Create the account first
       const result = await signup(username, name, password, selectedSchool);
-      authLogin(result.student_id, result.display_name);
+      authLogin(result.student_id, result.display_name, result.school ?? selectedSchool);
 
       // Submit initial mood + journal under the new account
       if (selectedMood) {

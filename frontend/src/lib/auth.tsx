@@ -5,12 +5,13 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 export interface AuthUser {
   studentId: string;
   displayName: string;
+  school?: string;
 }
 
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (studentId: string, displayName: string) => void;
+  login: (studentId: string, displayName: string, school?: string) => void;
   logout: () => void;
 }
 
@@ -43,8 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  const loginFn = useCallback((studentId: string, displayName: string) => {
-    const session: AuthUser = { studentId, displayName };
+  const loginFn = useCallback((studentId: string, displayName: string, school?: string) => {
+    const session: AuthUser = { studentId, displayName, school };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
     setUser(session);
   }, []);

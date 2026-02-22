@@ -1694,11 +1694,13 @@ async def signup(payload: SignupPayload):
             _demo_store["students"][payload.student_id].update({
                 "display_name": payload.display_name,
                 "password_hash": pw_hash,
+                "school": payload.school or _demo_store["students"][payload.student_id].get("school", ""),
             })
             return {
                 "status": "ok",
                 "student_id": payload.student_id,
                 "display_name": payload.display_name,
+                "school": _demo_store["students"][payload.student_id].get("school", payload.school),
             }
         _demo_store["students"][payload.student_id] = {
             "student_id": payload.student_id,
@@ -1744,6 +1746,7 @@ async def signup(payload: SignupPayload):
                 "status": "ok",
                 "student_id": payload.student_id,
                 "display_name": payload.display_name,
+                "school": payload.school,
             }
         try:
             _execute(
@@ -1770,6 +1773,7 @@ async def signup(payload: SignupPayload):
         "status": "ok",
         "student_id": payload.student_id,
         "display_name": payload.display_name,
+        "school": payload.school,
     }
 
 
@@ -1788,12 +1792,13 @@ async def login(payload: LoginPayload):
             "status": "ok",
             "student_id": payload.student_id,
             "display_name": student.get("display_name", payload.student_id),
+            "school": student.get("school", ""),
         }
     else:
         _ensure_auth_columns()
         try:
             rows = _execute(
-                "SELECT student_id, display_name, password_hash FROM students WHERE student_id = %s",
+                "SELECT student_id, display_name, password_hash, school FROM students WHERE student_id = %s",
                 (payload.student_id,),
                 fetch=True,
             )
@@ -1801,7 +1806,7 @@ async def login(payload: LoginPayload):
             if "PASSWORD_HASH" in str(exc).upper() and "INVALID IDENTIFIER" in str(exc).upper():
                 _ensure_auth_columns()
                 rows = _execute(
-                    "SELECT student_id, display_name, email_hash AS password_hash FROM students WHERE student_id = %s",
+                    "SELECT student_id, display_name, email_hash AS password_hash, school FROM students WHERE student_id = %s",
                     (payload.student_id,),
                     fetch=True,
                 )
@@ -1813,6 +1818,7 @@ async def login(payload: LoginPayload):
             "status": "ok",
             "student_id": rows[0]["student_id"],
             "display_name": rows[0].get("display_name", payload.student_id),
+            "school": rows[0].get("school", ""),
         }
 
 

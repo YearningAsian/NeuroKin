@@ -28,6 +28,7 @@ export interface AuthResponse {
   status: string;
   student_id: string;
   display_name: string;
+  school?: string;
 }
 
 /** Create a new student account and return session info. */
