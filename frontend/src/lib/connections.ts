@@ -33,7 +33,17 @@ export function getConnections(studentId: string): Connection[] {
   if (typeof window === "undefined") return [];
   try {
     const stored = localStorage.getItem(`${STORAGE_KEY}_${studentId}`);
-    return stored ? JSON.parse(stored) : [];
+    const connections: Connection[] = stored ? JSON.parse(stored) : [];
+    // Deduplicate messages on load (safeguard against React StrictMode / dirty dev state)
+    connections.forEach((c) => {
+      const seen = new Set<string>();
+      c.chatMessages = c.chatMessages.filter((m) => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      });
+    });
+    return connections;
   } catch {
     return [];
   }
@@ -73,53 +83,20 @@ export function appendMessage(
   return connections;
 }
 
-/* ---------- AI twin-to-twin conversation generator ---------- */
+/* ---------- Initial Chat Generator ---------- */
 
-export function generateTwinConversation(
+export function getInitialMessage(
   userName: string,
   peerName: string,
-  sharedThemes: string[],
   icebreaker: string,
 ): ChatMessage[] {
-  const t = sharedThemes.slice(0, 3);
-  const ts = Date.now();
-
-  const lines: { sender: "user_twin" | "peer_twin"; text: string }[] = [
+  return [
     {
-      sender: "user_twin",
-      text: icebreaker,
-    },
-    {
+      id: `twin-${Date.now()}`,
       sender: "peer_twin",
-      text: `That's a really thoughtful way to start! I've been reflecting on ${t[0] || "similar things"} a lot lately.`,
-    },
-    {
-      sender: "user_twin",
-      text: `Right? I find that ${t[0] || "it"} helps me understand myself on a deeper level.${t[1] ? ` I've also been exploring ${t[1]}.` : ""}`,
-    },
-    {
-      sender: "peer_twin",
-      text: `I relate to that so much.${t[1] ? ` ${t[1]} is something I think about often too.` : ""} It's nice to find someone who sees things the same way.`,
-    },
-    {
-      sender: "user_twin",
-      text: `Totally. For me it's about finding people who genuinely understand.${t[2] ? ` I think ${t[2]} is what really brings people together.` : ""}`,
-    },
-    {
-      sender: "peer_twin",
-      text: "I couldn't agree more. I feel like we'd have a lot of great conversations. Let's definitely keep in touch! 😊",
-    },
-    {
-      sender: "user_twin",
-      text: "Absolutely! Looking forward to it 💛",
+      senderName: peerName,
+      text: icebreaker || `Hi ${userName}! Based on our profiles, we might get along.`,
+      timestamp: new Date().toISOString(),
     },
   ];
-
-  return lines.map((l, i) => ({
-    id: `twin-${ts}-${i}`,
-    sender: l.sender,
-    senderName: l.sender === "user_twin" ? `${userName}'s Twin` : `${peerName}'s Twin`,
-    text: l.text,
-    timestamp: new Date(ts + i * 25_000).toISOString(),
-  }));
 }

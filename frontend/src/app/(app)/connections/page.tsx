@@ -34,7 +34,7 @@ import {
   getConnections,
   addConnection,
   removeConnection as removeConn,
-  generateTwinConversation,
+  getInitialMessage,
   type Connection,
 } from "@/lib/connections";
 
@@ -144,10 +144,9 @@ function RecommendationCard({
   const handleConnect = async () => {
     scheduleRemoval("connected");
     await submitFeedback(studentId, match.peer_id, true).catch(console.error);
-    const messages = generateTwinConversation(
+    const messages = getInitialMessage(
       userName,
       match.display_name,
-      match.shared_themes,
       match.icebreaker,
     );
     const conn: Connection = {
@@ -449,7 +448,7 @@ export default function ConnectionsPage() {
             <div className="text-2xl font-bold text-emerald-600">
               {Math.round(
                 (data ?? []).reduce((a, b) => a + b.compatibility_score, 0) /
-                  ((data ?? []).length || 1),
+                ((data ?? []).length || 1),
               )}
               %
             </div>

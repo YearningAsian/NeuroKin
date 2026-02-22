@@ -27,6 +27,7 @@ function ChatWindow({
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>(connection.chatMessages);
   const [text, setText] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // Keep messages in sync with localStorage
@@ -34,29 +35,66 @@ function ChatWindow({
     const sync = () => {
       const conns = getConnections(studentId);
       const c = conns.find((cn) => cn.peerId === connection.peerId);
-      if (c) setMessages([...c.chatMessages]);
+      if (c) {
+        // StrictMode protection: deduplicate the array by ID before setting state
+        const seen = new Set<string>();
+        const unique = c.chatMessages.filter(m => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        });
+        setMessages(unique);
+      }
     };
     window.addEventListener("connections-updated", sync);
     return () => window.removeEventListener("connections-updated", sync);
   }, [studentId, connection.peerId]);
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages and typing state
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages.length]);
+  }, [messages.length, isTyping]);
+
+  const getBotReply = (userText: string) => {
+    const lower = userText.toLowerCase();
+    if (lower.includes("hi") || lower.includes("hello") || lower.includes("hey")) return "Hey there! How's it going?";
+    if (lower.includes("how are you")) return "I'm doing pretty well, thanks for asking! Just been working on some stuff. How about you?";
+    if (lower.includes("what are you up to") || lower.includes("doing")) return "Just relaxing at the moment. It's nice to meet someone new on here!";
+    if (lower.includes("cool") || lower.includes("nice") || lower.includes("awesome")) return "Right? I was pleasantly surprised to see how much we have in common.";
+    if (lower.includes("music")) return "I literally can't focus without music. What kind of artists are you into lately?";
+    if (lower.includes("school") || lower.includes("class")) return "School has been really intense lately... I definitely need more breaks. Are your classes hard this semester?";
+    if (lower.includes("yes") || lower.includes("yeah") || lower.includes("yep")) return "Totally agree. It's so refreshing to hear someone else say that!";
+    if (lower.length > 20) return "That's really interesting. Tell me more about that!";
+    return "Haha yeah, I totally feel that! Honestly I've been thinking about getting more into that kind of thing. What are your thoughts?";
+  };
 
   const handleSend = () => {
     if (!text.trim()) return;
     const msg: ChatMessage = {
-      id: `usr-${Date.now()}`,
+      id: `usr-${crypto.randomUUID()}`,
       sender: "user",
       senderName: userName,
       text: text.trim(),
       timestamp: new Date().toISOString(),
     };
+
+    // appendMessage already fires 'connections-updated' which will sync our state
     appendMessage(studentId, connection.peerId, msg);
-    setMessages((prev) => [...prev, msg]);
     setText("");
+
+    // Simulate human typing delay
+    setIsTyping(true);
+    setTimeout(() => {
+      const replyMsg: ChatMessage = {
+        id: `peer-${crypto.randomUUID()}`,
+        sender: "peer_twin",
+        senderName: connection.displayName,
+        text: getBotReply(msg.text),
+        timestamp: new Date().toISOString(),
+      };
+      appendMessage(studentId, connection.peerId, replyMsg);
+      setIsTyping(false);
+    }, 1500 + Math.random() * 1500); // 1.5s to 3s delay
   };
 
   return (
@@ -84,17 +122,26 @@ function ChatWindow({
                 {m.senderName}
               </span>
               <div
-                className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${
-                  isMe
-                    ? "bg-[var(--color-primary)] text-white rounded-br-md"
-                    : "bg-white border border-[var(--color-border)] text-[var(--color-text)] rounded-bl-md"
-                }`}
+                className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${isMe
+                  ? "bg-[var(--color-primary)] text-white rounded-br-md"
+                  : "bg-white border border-[var(--color-border)] text-[var(--color-text)] rounded-bl-md"
+                  }`}
               >
                 {m.text}
               </div>
             </div>
           );
         })}
+        {isTyping && (
+          <div className="flex flex-col items-start animate-fade-in-up">
+            <span className="text-[10px] text-[var(--color-text-muted)] mb-0.5 px-1">
+              {connection.displayName} is typing...
+            </span>
+            <div className="bg-white border border-[var(--color-border)] text-[var(--color-text)] px-3 py-2 rounded-2xl rounded-bl-md text-sm">
+              <span className="animate-pulse">...</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input */}
@@ -157,6 +204,7 @@ export default function ChatWidget() {
       {/* Chat window */}
       {activeConnection && (
         <ChatWindow
+          key={activeConnection.peerId}
           connection={activeConnection}
           userName={userName}
           studentId={studentId}
@@ -172,11 +220,10 @@ export default function ChatWidget() {
             onClick={() =>
               setActiveChatPeer((prev) => (prev === c.peerId ? null : c.peerId))
             }
-            className={`relative w-11 h-11 rounded-full border-2 shadow-lg transition-all hover:scale-110 ${
-              activeChatPeer === c.peerId
-                ? "border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/30"
-                : "border-white"
-            }`}
+            className={`relative w-11 h-11 rounded-full border-2 shadow-lg transition-all hover:scale-110 ${activeChatPeer === c.peerId
+              ? "border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/30"
+              : "border-white"
+              }`}
             title={c.displayName}
           >
             <img
