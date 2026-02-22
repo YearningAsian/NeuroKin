@@ -201,11 +201,11 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 # Option A: Demo mode (no Snowflake needed)
-DEMO_MODE=1 uvicorn main:app --reload --port 8000
+DEMO_MODE=1 python -m uvicorn main:app --reload --port 8000
 
 # Option B: Production mode
 cp .env.example .env        # Edit with your Snowflake credentials
-uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --reload --port 8000
 
 # → http://localhost:8000/docs (OpenAPI explorer)
 ```
