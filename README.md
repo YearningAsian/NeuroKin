@@ -201,11 +201,11 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 # Option A: Demo mode (no Snowflake needed)
-DEMO_MODE=1 uvicorn main:app --reload --port 8000
+DEMO_MODE=1 python -m uvicorn main:app --reload --port 8000
 
 # Option B: Production mode
 cp .env.example .env        # Edit with your Snowflake credentials
-uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --reload --port 8000
 
 # → http://localhost:8000/docs (OpenAPI explorer)
 ```
@@ -360,18 +360,6 @@ No routing logic changes needed — FastAPI auto-serializes from the model.
 - **GTM Strategy**: Free for students, institutional license ($2–5/student/yr) for universities wanting aggregate wellbeing dashboards
 - **Moat**: Proprietary emotional embedding model trained on opt-in journal data; network effects per campus
 - **Category-Defining Product**: No competitor combines evolving emotional digital twins with AI-powered compatibility matching
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-Please follow the existing code style (Prettier + ESLint for frontend, Black + Ruff for backend).
 
 ---
 

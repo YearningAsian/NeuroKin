@@ -2,8 +2,8 @@
 """
 NeuroTwin Demo Seed Script
 =========================
-Creates multiple demo student accounts with journal entries, mood check‑ins,
-and activities so the app is immediately demonstrable.
+Creates 20 Duke University demo student accounts with journal entries,
+mood check‑ins, and activities so the app is immediately demonstrable.
 
 Usage:
     # Start the backend first (DEMO_MODE=1 by default):
@@ -15,19 +15,7 @@ Usage:
     # Or with a custom base URL:
     #   python seed.py --url http://localhost:8000
 
-Accounts created:  (password: demo)
-  demo-alex    — Curious, creative, AI & music
-  demo-jordan  — Empathetic writer, yoga & mindfulness
-  demo-sam     — Energetic, entrepreneurial, sports & coding
-  demo-riley   — Calm, scholarly, astronomy & meditation
-  demo-casey   — Determined techie, gaming & robotics
-  demo-morgan  — Compassionate activist, dance & poetry
-  demo-alex    — curious CS student into AI and music
-  demo-jordan  — empathetic psych major, loves writing
-  demo-sam     — energetic entrepreneur, fitness buff
-  demo-riley   — calm astronomy nerd, reader
-  demo-casey   — determined gamer / CS builder
-  demo-morgan  — empathetic community organiser, poet
+All accounts use password: demo
 """
 
 from __future__ import annotations
@@ -47,190 +35,393 @@ import requests
 API_BASE = "http://localhost:8000"
 
 DEMO_ACCOUNTS = [
+    # ── Cluster A: Tech / AI Enthusiasts ──
     {
-        "student_id": "demo-alex",
-        "display_name": "Alex",
+        "student_id": "duke-emma",
+        "display_name": "Emma",
         "journal_entries": [
-            {
-                "text": "I've been really excited about my AI class project. We're building a recommendation system and the math behind collaborative filtering is beautiful. Spent the afternoon coding and lost track of time — in the best way. Also went for a run afterwards and feel great.",
-                "mood_label": "excited",
-                "tags": ["artificial intelligence", "coding", "fitness"],
-            },
-            {
-                "text": "Had a thoughtful conversation with Jordan about empathy in tech design. It made me think about how the tools we build affect real people. Feeling grateful for friends who challenge my perspective.",
-                "mood_label": "reflective",
-                "tags": ["Social", "Growth", "Reflection"],
-            },
-            {
-                "text": "Guitar practice today was amazing. I finally nailed the solo I've been working on for weeks. Music is such a good reset after a long day of studying.",
-                "mood_label": "happy",
-                "tags": ["music", "creativity"],
-            },
+            {"text": "Spent all afternoon training a neural net for my AI class project. The math behind gradient descent finally clicked. Went for a trail run after and felt amazing.", "mood_label": "excited", "tags": ["artificial intelligence", "coding", "fitness"]},
+            {"text": "Had an inspiring study group session about transformer architectures. Afterwards we played guitar on the quad — perfect blend of mind and soul.", "mood_label": "happy", "tags": ["artificial intelligence", "music", "Social"]},
+            {"text": "Meditation session this morning before my algorithms exam helped me stay centred. Mindfulness really does sharpen focus.", "mood_label": "calm", "tags": ["mindfulness", "Academic"]},
         ],
         "mood_checkins": [
-            {"mood_label": "excited", "energy_level": 8, "stress_level": 3, "social_battery": 7, "notes": "Great day in the lab"},
-            {"mood_label": "calm", "energy_level": 6, "stress_level": 4, "social_battery": 5},
-            {"mood_label": "happy", "energy_level": 7, "stress_level": 2, "social_battery": 8, "notes": "Post-run endorphins"},
+            {"mood_label": "excited", "energy_level": 8, "stress_level": 3, "social_battery": 7, "notes": "Great lab day"},
+            {"mood_label": "calm", "energy_level": 6, "stress_level": 2, "social_battery": 5},
+            {"mood_label": "happy", "energy_level": 7, "stress_level": 2, "social_battery": 8, "notes": "Post-run high"},
         ],
         "activities": [
-            {"activity_type": "coding", "description": "AI project — collaborative filtering", "duration_mins": 120},
-            {"activity_type": "guitar", "description": "Solo practice session", "duration_mins": 45},
-            {"activity_type": "trail running", "description": "5k on the campus loop", "duration_mins": 30},
+            {"activity_type": "coding", "description": "Neural network training", "duration_mins": 150},
+            {"activity_type": "trail running", "description": "Campus loop 5k", "duration_mins": 30},
+            {"activity_type": "guitar", "description": "Quad jam session", "duration_mins": 40},
         ],
     },
     {
-        "student_id": "demo-jordan",
-        "display_name": "Jordan",
+        "student_id": "duke-liam",
+        "display_name": "Liam",
         "journal_entries": [
-            {
-                "text": "Volunteered at the community centre today. The kids are so resilient — they teach me way more than I teach them. Journaling about it helped me process some big feelings about privilege and purpose.",
-                "mood_label": "reflective",
-                "tags": ["empathy", "volunteering", "Reflection"],
-            },
-            {
-                "text": "Feeling a bit drained after a long week. I care so much about people around me that I forget to check in with myself. Going to do yoga tonight and just breathe.",
-                "mood_label": "tired",
-                "tags": ["self-care", "yoga", "mindfulness"],
-            },
-            {
-                "text": "Started reading a new book on positive psychology. The chapter on 'flow states' resonated deeply — I feel that when I write poetry.",
-                "mood_label": "calm",
-                "tags": ["psychology", "creative writing", "reading"],
-            },
+            {"text": "Built a reinforcement learning agent that can play Connect Four. Watching it learn strategies on its own is magical. Also did a long hike at Eno River.", "mood_label": "excited", "tags": ["artificial intelligence", "coding", "hiking"]},
+            {"text": "Reading about meditation and its effects on neural plasticity. The intersection of neuroscience and mindfulness is fascinating.", "mood_label": "reflective", "tags": ["meditation", "reading", "Growth"]},
+            {"text": "Robotics club meeting went well — we're designing an autonomous drone for the competition. Teamwork makes the dream work.", "mood_label": "happy", "tags": ["robotics", "coding", "teamwork"]},
+        ],
+        "mood_checkins": [
+            {"mood_label": "happy", "energy_level": 7, "stress_level": 3, "social_battery": 6},
+            {"mood_label": "calm", "energy_level": 6, "stress_level": 2, "social_battery": 5, "notes": "Post-hike peace"},
+            {"mood_label": "excited", "energy_level": 8, "stress_level": 4, "social_battery": 7, "notes": "Drone project kickoff"},
+        ],
+        "activities": [
+            {"activity_type": "coding", "description": "RL agent for Connect Four", "duration_mins": 180},
+            {"activity_type": "trail running", "description": "Eno River trail", "duration_mins": 60},
+            {"activity_type": "reading", "description": "Neuroscience of meditation", "duration_mins": 45},
+        ],
+    },
+    {
+        "student_id": "duke-sophia",
+        "display_name": "Sophia",
+        "journal_entries": [
+            {"text": "Data science competition this weekend! Our team used NLP to analyze sentiment in climate articles. Coding late nights but the results are incredible.", "mood_label": "excited", "tags": ["artificial intelligence", "coding", "nature"]},
+            {"text": "Yoga class followed by coding session — this is my ideal day. Balance between body and mind is something I've learned to prioritize at Duke.", "mood_label": "calm", "tags": ["yoga", "coding", "mindfulness"]},
+            {"text": "Played guitar at open mic night. Being creative outside of STEM recharges me in ways nothing else can.", "mood_label": "happy", "tags": ["music", "creativity"]},
+        ],
+        "mood_checkins": [
+            {"mood_label": "excited", "energy_level": 7, "stress_level": 4, "social_battery": 6},
+            {"mood_label": "calm", "energy_level": 6, "stress_level": 2, "social_battery": 5, "notes": "Yoga + code flow"},
+            {"mood_label": "happy", "energy_level": 7, "stress_level": 2, "social_battery": 7, "notes": "Open mic night"},
+        ],
+        "activities": [
+            {"activity_type": "coding", "description": "NLP sentiment analysis project", "duration_mins": 200},
+            {"activity_type": "yoga", "description": "Morning Vinyasa flow", "duration_mins": 45},
+            {"activity_type": "guitar", "description": "Open mic performance", "duration_mins": 30},
+        ],
+    },
+    {
+        "student_id": "duke-ethan",
+        "display_name": "Ethan",
+        "journal_entries": [
+            {"text": "Late night coding session for the hackathon. Our team built an AI chatbot prototype in 24 hours. Exhausted but proud.", "mood_label": "excited", "tags": ["coding", "artificial intelligence", "teamwork"]},
+            {"text": "Gaming tournament this weekend helped me decompress from midterms. Competitive games sharpen my strategic thinking.", "mood_label": "happy", "tags": ["gaming", "Social"]},
+            {"text": "Struggling with the music production software but making progress. Creating beats is like writing code — iterative and rewarding.", "mood_label": "reflective", "tags": ["music production", "creativity", "Growth"]},
+        ],
+        "mood_checkins": [
+            {"mood_label": "excited", "energy_level": 7, "stress_level": 6, "social_battery": 7, "notes": "Hackathon adrenaline"},
+            {"mood_label": "happy", "energy_level": 6, "stress_level": 3, "social_battery": 6},
+            {"mood_label": "anxious", "energy_level": 5, "stress_level": 7, "social_battery": 4, "notes": "Midterm pressure"},
+        ],
+        "activities": [
+            {"activity_type": "coding", "description": "Hackathon chatbot build", "duration_mins": 360},
+            {"activity_type": "gaming", "description": "Weekend tournament", "duration_mins": 120},
+            {"activity_type": "coding", "description": "Music production in Ableton", "duration_mins": 90},
+        ],
+    },
+
+    # ── Cluster B: Creative / Empathetic ──
+    {
+        "student_id": "duke-olivia",
+        "display_name": "Olivia",
+        "journal_entries": [
+            {"text": "Led a poetry workshop at the community centre. Watching shy first-years open up through verse was the highlight of my week.", "mood_label": "happy", "tags": ["poetry", "community", "empathy"]},
+            {"text": "Dance rehearsal for the spring showcase. Our piece explores belonging and identity — movement says what words can't.", "mood_label": "reflective", "tags": ["dance", "creativity", "mindfulness"]},
+            {"text": "Morning yoga and journaling. I'm learning that stillness is not emptiness — it's fullness waiting to be noticed.", "mood_label": "calm", "tags": ["yoga", "mindfulness", "psychology"]},
+        ],
+        "mood_checkins": [
+            {"mood_label": "happy", "energy_level": 7, "stress_level": 3, "social_battery": 8, "notes": "Poetry workshop glow"},
+            {"mood_label": "calm", "energy_level": 5, "stress_level": 2, "social_battery": 4},
+            {"mood_label": "reflective", "energy_level": 5, "stress_level": 3, "social_battery": 5, "notes": "Journaling clarity"},
+        ],
+        "activities": [
+            {"activity_type": "dance", "description": "Spring showcase choreography", "duration_mins": 90},
+            {"activity_type": "volunteering", "description": "Poetry workshop at community centre", "duration_mins": 120},
+            {"activity_type": "yoga", "description": "Morning Hatha session", "duration_mins": 40},
+        ],
+    },
+    {
+        "student_id": "duke-noah",
+        "display_name": "Noah",
+        "journal_entries": [
+            {"text": "Psychology of empathy lecture blew my mind today. Mirror neurons are fascinating — we're literally wired to feel each other's pain.", "mood_label": "reflective", "tags": ["psychology", "empathy", "Growth"]},
+            {"text": "Wrote a short story about loneliness in the digital age. Creative writing lets me explore emotions I can't talk about out loud.", "mood_label": "calm", "tags": ["creative writing", "Reflection"]},
+            {"text": "Volunteered at the food bank with friends. Physical labour + meaningful purpose = the best kind of tired.", "mood_label": "happy", "tags": ["volunteering", "community", "Social"]},
         ],
         "mood_checkins": [
             {"mood_label": "calm", "energy_level": 5, "stress_level": 3, "social_battery": 4},
-            {"mood_label": "reflective", "energy_level": 4, "stress_level": 5, "social_battery": 3, "notes": "Need some alone time"},
-            {"mood_label": "happy", "energy_level": 6, "stress_level": 2, "social_battery": 6, "notes": "Good yoga session"},
+            {"mood_label": "reflective", "energy_level": 4, "stress_level": 4, "social_battery": 3, "notes": "Heavy lecture day"},
+            {"mood_label": "happy", "energy_level": 6, "stress_level": 2, "social_battery": 7, "notes": "Volunteering glow"},
         ],
         "activities": [
-            {"activity_type": "journaling", "description": "Evening reflection", "duration_mins": 20},
-            {"activity_type": "yoga", "description": "Gentle flow", "duration_mins": 45},
-            {"activity_type": "volunteering", "description": "Community centre tutoring", "duration_mins": 90},
+            {"activity_type": "journaling", "description": "Evening creative writing", "duration_mins": 45},
+            {"activity_type": "yoga", "description": "Restorative session", "duration_mins": 30},
+            {"activity_type": "volunteering", "description": "Food bank shift", "duration_mins": 120},
         ],
     },
     {
-        "student_id": "demo-sam",
-        "display_name": "Sam",
+        "student_id": "duke-ava",
+        "display_name": "Ava",
         "journal_entries": [
-            {
-                "text": "Pitched my startup idea in class today — an app that matches study groups by learning style. Got great feedback! Nervous but excited to build the prototype this weekend.",
-                "mood_label": "excited",
-                "tags": ["entrepreneurship", "coding", "Growth"],
-            },
-            {
-                "text": "Basketball game was intense. We lost but played as a real team for the first time. There's something about shared struggle that bonds people instantly.",
-                "mood_label": "reflective",
-                "tags": ["fitness", "teamwork", "Social"],
-            },
-            {
-                "text": "Stressed about deadlines stacking up. Three projects due next week. Made a plan though — breaking it into chunks always helps me feel in control.",
-                "mood_label": "anxious",
-                "tags": ["Academic", "stress management"],
-            },
+            {"text": "Organised a panel on social justice in higher education. The conversations were raw and real. Change starts with dialogue.", "mood_label": "reflective", "tags": ["social justice", "community"]},
+            {"text": "Yoga retreat this weekend brought me back to centre. My body holds so much tension from advocacy work — I need to release it more often.", "mood_label": "calm", "tags": ["yoga", "mindfulness", "self-care"]},
+            {"text": "Writing an essay on intersectionality for the campus journal. Creative writing and activism are inseparable for me.", "mood_label": "happy", "tags": ["creative writing", "social justice", "Growth"]},
         ],
         "mood_checkins": [
-            {"mood_label": "excited", "energy_level": 9, "stress_level": 4, "social_battery": 9},
-            {"mood_label": "frustrated", "energy_level": 7, "stress_level": 7, "social_battery": 6, "notes": "Too many deadlines"},
-            {"mood_label": "happy", "energy_level": 8, "stress_level": 3, "social_battery": 8, "notes": "Good practice"},
+            {"mood_label": "reflective", "energy_level": 5, "stress_level": 5, "social_battery": 6, "notes": "Panel was intense"},
+            {"mood_label": "calm", "energy_level": 6, "stress_level": 2, "social_battery": 3, "notes": "Yoga retreat peace"},
+            {"mood_label": "happy", "energy_level": 6, "stress_level": 3, "social_battery": 5},
         ],
         "activities": [
-            {"activity_type": "basketball", "description": "League game", "duration_mins": 90},
-            {"activity_type": "cooking", "description": "Meal prepped for the week", "duration_mins": 60},
-            {"activity_type": "coding", "description": "Startup prototype work", "duration_mins": 180},
+            {"activity_type": "volunteering", "description": "Social justice panel organising", "duration_mins": 180},
+            {"activity_type": "yoga", "description": "Weekend retreat", "duration_mins": 120},
+            {"activity_type": "journaling", "description": "Intersectionality essay draft", "duration_mins": 60},
         ],
     },
     {
-        "student_id": "demo-riley",
-        "display_name": "Riley",
+        "student_id": "duke-isabella",
+        "display_name": "Isabella",
         "journal_entries": [
-            {
-                "text": "Stargazing from the hill last night was magical. The Milky Way was crystal clear. There's a deep comfort in knowing how vast the universe is — my problems feel so small and manageable.",
-                "mood_label": "calm",
-                "tags": ["astronomy", "Nature", "mindfulness"],
-            },
-            {
-                "text": "Finished reading 'Sapiens' today. It fundamentally changed how I think about history and our place in it. Want to discuss it with someone who's also read it.",
-                "mood_label": "reflective",
-                "tags": ["reading", "Growth", "Reflection"],
-            },
-            {
-                "text": "Painted a watercolour of the campus lake at sunset. Art lets me express feelings I can't put into words. Feeling centred and grateful.",
-                "mood_label": "happy",
-                "tags": ["art history", "creativity", "Nature"],
-            },
+            {"text": "Contemporary dance class explored vulnerability through movement. I cried during the cool-down and it felt like healing.", "mood_label": "reflective", "tags": ["dance", "psychology", "mindfulness"]},
+            {"text": "Wrote a poem about my grandmother's garden. Nostalgia isn't sadness — it's love with nowhere to go.", "mood_label": "calm", "tags": ["poetry", "nostalgia"]},
+            {"text": "Late night music session with friends. Singing harmonies in the dorm hallway is pure joy.", "mood_label": "happy", "tags": ["music", "Social", "community"]},
+        ],
+        "mood_checkins": [
+            {"mood_label": "reflective", "energy_level": 5, "stress_level": 3, "social_battery": 5},
+            {"mood_label": "calm", "energy_level": 5, "stress_level": 2, "social_battery": 3, "notes": "Quiet writing day"},
+            {"mood_label": "happy", "energy_level": 6, "stress_level": 2, "social_battery": 7, "notes": "Dorm sing-along"},
+        ],
+        "activities": [
+            {"activity_type": "dance", "description": "Contemporary dance workshop", "duration_mins": 75},
+            {"activity_type": "journaling", "description": "Poetry writing session", "duration_mins": 40},
+            {"activity_type": "yoga", "description": "Morning stretch routine", "duration_mins": 20},
+        ],
+    },
+
+    # ── Cluster C: Entrepreneurial / Athletic ──
+    {
+        "student_id": "duke-jackson",
+        "display_name": "Jackson",
+        "journal_entries": [
+            {"text": "Pitched my food-delivery app idea to angel investors. Nerve-wracking but the Q&A went great. This could actually happen!", "mood_label": "excited", "tags": ["entrepreneurship", "Growth"]},
+            {"text": "Pickup basketball at Cameron. Nothing clears my head like competing on the court. Also tried a new curry recipe — turned out incredible.", "mood_label": "happy", "tags": ["fitness", "basketball", "cooking"]},
+            {"text": "Feeling anxious about balancing the startup with coursework. Need to delegate more. Went for a long run to clear my head.", "mood_label": "anxious", "tags": ["stress", "entrepreneurship", "fitness"]},
+        ],
+        "mood_checkins": [
+            {"mood_label": "excited", "energy_level": 9, "stress_level": 5, "social_battery": 9},
+            {"mood_label": "happy", "energy_level": 8, "stress_level": 3, "social_battery": 8, "notes": "Great game + cooking"},
+            {"mood_label": "anxious", "energy_level": 7, "stress_level": 7, "social_battery": 5, "notes": "Startup pressure"},
+        ],
+        "activities": [
+            {"activity_type": "basketball", "description": "Pickup at Cameron", "duration_mins": 90},
+            {"activity_type": "cooking", "description": "Thai curry experiment", "duration_mins": 60},
+            {"activity_type": "coding", "description": "App prototype sprint", "duration_mins": 180},
+        ],
+    },
+    {
+        "student_id": "duke-mia",
+        "display_name": "Mia",
+        "journal_entries": [
+            {"text": "Ran a 10k personal best today! Training for the Duke half-marathon. Also sketched business model ideas at the café afterwards.", "mood_label": "excited", "tags": ["fitness", "entrepreneurship", "Growth"]},
+            {"text": "Travel photography exhibition at Nasher Museum inspired me. Seeing the world through other people's lenses shifts your own perspective.", "mood_label": "reflective", "tags": ["photography", "travel", "creativity"]},
+            {"text": "Cooked dinner for the whole dorm floor. Food brings people together — maybe that's my real startup idea.", "mood_label": "happy", "tags": ["cooking", "community", "Social"]},
+        ],
+        "mood_checkins": [
+            {"mood_label": "excited", "energy_level": 9, "stress_level": 3, "social_battery": 7, "notes": "10k PR!"},
+            {"mood_label": "happy", "energy_level": 7, "stress_level": 2, "social_battery": 8},
+            {"mood_label": "calm", "energy_level": 6, "stress_level": 3, "social_battery": 6, "notes": "Relaxing evening cooking"},
+        ],
+        "activities": [
+            {"activity_type": "trail running", "description": "10k personal best", "duration_mins": 52},
+            {"activity_type": "cooking", "description": "Dorm dinner party", "duration_mins": 90},
+            {"activity_type": "yoga", "description": "Recovery stretching", "duration_mins": 20},
+        ],
+    },
+    {
+        "student_id": "duke-aiden",
+        "display_name": "Aiden",
+        "journal_entries": [
+            {"text": "Intramural basketball finals tomorrow. We've been practising all semester — win or lose, this team is family.", "mood_label": "excited", "tags": ["basketball", "fitness", "teamwork"]},
+            {"text": "Listened to a startup podcast about failing fast. It resonated — my first two business ideas flopped but I learned everything from them.", "mood_label": "reflective", "tags": ["entrepreneurship", "Growth", "Reflection"]},
+            {"text": "Guitar jam with teammates after practice. Who knew our centre plays blues? Music breaks down every social barrier.", "mood_label": "happy", "tags": ["music", "Social", "creativity"]},
+        ],
+        "mood_checkins": [
+            {"mood_label": "excited", "energy_level": 9, "stress_level": 4, "social_battery": 9, "notes": "Finals prep energy"},
+            {"mood_label": "reflective", "energy_level": 6, "stress_level": 5, "social_battery": 5},
+            {"mood_label": "happy", "energy_level": 7, "stress_level": 3, "social_battery": 8, "notes": "Post-jam vibes"},
+        ],
+        "activities": [
+            {"activity_type": "basketball", "description": "Finals practice", "duration_mins": 120},
+            {"activity_type": "guitar", "description": "Blues jam with team", "duration_mins": 45},
+            {"activity_type": "trail running", "description": "Morning conditioning run", "duration_mins": 35},
+        ],
+    },
+
+    # ── Cluster D: Academic / Reflective ──
+    {
+        "student_id": "duke-charlotte",
+        "display_name": "Charlotte",
+        "journal_entries": [
+            {"text": "Philosophy seminar on consciousness was extraordinary. Nagel's 'What Is It Like to Be a Bat?' keeps spinning in my head. Painted afterwards to process.", "mood_label": "reflective", "tags": ["philosophy", "art history", "Reflection"]},
+            {"text": "Spent the evening stargazing at the observatory. Jupiter's moons were crystal clear. The universe is the best meditation.", "mood_label": "calm", "tags": ["astronomy", "meditation", "Nature"]},
+            {"text": "Finished Virginia Woolf's 'To the Lighthouse'. Her prose is like watercolour — everything bleeds into everything else.", "mood_label": "happy", "tags": ["reading", "creativity"]},
         ],
         "mood_checkins": [
             {"mood_label": "calm", "energy_level": 4, "stress_level": 2, "social_battery": 3},
-            {"mood_label": "happy", "energy_level": 5, "stress_level": 1, "social_battery": 4, "notes": "Peaceful day"},
+            {"mood_label": "reflective", "energy_level": 4, "stress_level": 1, "social_battery": 2, "notes": "Stargazing peace"},
+            {"mood_label": "happy", "energy_level": 5, "stress_level": 1, "social_battery": 4, "notes": "Book bliss"},
+        ],
+        "activities": [
+            {"activity_type": "reading", "description": "Virginia Woolf novel", "duration_mins": 90},
+            {"activity_type": "stargazing", "description": "Observatory night", "duration_mins": 120},
+            {"activity_type": "painting", "description": "Watercolour still life", "duration_mins": 60},
+        ],
+    },
+    {
+        "student_id": "duke-lucas",
+        "display_name": "Lucas",
+        "journal_entries": [
+            {"text": "Read Camus' 'The Stranger' in one sitting. Existentialism hits different when you're staring at the stars afterwards.", "mood_label": "reflective", "tags": ["philosophy", "reading", "astronomy"]},
+            {"text": "Trail run through Duke Forest. The autumn leaves are peak right now. Nature is the original philosopher — always teaching impermanence.", "mood_label": "calm", "tags": ["nature", "fitness", "mindfulness"]},
+            {"text": "Started writing a short story about time travel and memory. Creative writing is philosophy with characters.", "mood_label": "happy", "tags": ["creative writing", "philosophy", "creativity"]},
+        ],
+        "mood_checkins": [
             {"mood_label": "reflective", "energy_level": 4, "stress_level": 2, "social_battery": 3},
+            {"mood_label": "calm", "energy_level": 5, "stress_level": 1, "social_battery": 3, "notes": "Forest run clarity"},
+            {"mood_label": "happy", "energy_level": 5, "stress_level": 2, "social_battery": 4, "notes": "Writing flow state"},
         ],
         "activities": [
-            {"activity_type": "stargazing", "description": "Observatory hill session", "duration_mins": 90},
-            {"activity_type": "painting", "description": "Watercolour at the lake", "duration_mins": 60},
-            {"activity_type": "reading", "description": "Finished Sapiens", "duration_mins": 45},
+            {"activity_type": "reading", "description": "Camus deep dive", "duration_mins": 120},
+            {"activity_type": "trail running", "description": "Duke Forest autumn run", "duration_mins": 45},
+            {"activity_type": "journaling", "description": "Short story draft", "duration_mins": 60},
         ],
     },
     {
-        "student_id": "demo-casey",
-        "display_name": "Casey",
+        "student_id": "duke-amelia",
+        "display_name": "Amelia",
         "journal_entries": [
-            {
-                "text": "Made a breakthrough on my robotics project — the arm can now pick up objects with 95% accuracy! The debugging took days but that moment of success was worth every frustrated hour.",
-                "mood_label": "excited",
-                "tags": ["robotics", "coding", "artificial intelligence"],
-            },
-            {
-                "text": "Gaming session with friends online tonight. It's funny how virtual worlds create real friendships. We've been playing together for three years now.",
-                "mood_label": "happy",
-                "tags": ["gaming", "Social", "friendship"],
-            },
-            {
-                "text": "Feeling anxious about the machine learning exam. I understand the concepts but the math notation trips me up. Going to do extra practice problems tonight.",
-                "mood_label": "anxious",
-                "tags": ["Academic", "artificial intelligence", "stress"],
-            },
+            {"text": "Spent the day at the Nasher Museum studying Renaissance paintings. The way light falls in Caravaggio's work — it's theatrical. Pure emotion on canvas.", "mood_label": "reflective", "tags": ["art history", "museum", "creativity"]},
+            {"text": "Journaling about nostalgia — why do certain memories carry so much weight? Philosophy and psychology intertwine here.", "mood_label": "calm", "tags": ["journaling", "philosophy", "Reflection"]},
+            {"text": "Read a beautiful essay on the philosophy of memory. Started painting my own interpretation afterwards.", "mood_label": "happy", "tags": ["reading", "philosophy", "art history"]},
         ],
         "mood_checkins": [
-            {"mood_label": "excited", "energy_level": 8, "stress_level": 5, "social_battery": 6, "notes": "Robotics breakthrough"},
-            {"mood_label": "happy", "energy_level": 7, "stress_level": 3, "social_battery": 7},
-            {"mood_label": "anxious", "energy_level": 5, "stress_level": 8, "social_battery": 4, "notes": "Exam stress"},
+            {"mood_label": "reflective", "energy_level": 4, "stress_level": 2, "social_battery": 2},
+            {"mood_label": "calm", "energy_level": 3, "stress_level": 1, "social_battery": 2, "notes": "Museum solitude"},
+            {"mood_label": "happy", "energy_level": 4, "stress_level": 2, "social_battery": 3, "notes": "Painting flow"},
         ],
         "activities": [
-            {"activity_type": "coding", "description": "Robotics arm project", "duration_mins": 240},
-            {"activity_type": "gaming", "description": "Online session with friends", "duration_mins": 120},
-            {"activity_type": "reading", "description": "ML textbook review", "duration_mins": 60},
+            {"activity_type": "reading", "description": "Philosophy of memory essay", "duration_mins": 60},
+            {"activity_type": "painting", "description": "Memory interpretation piece", "duration_mins": 90},
+            {"activity_type": "journaling", "description": "Nostalgia reflection", "duration_mins": 30},
+        ],
+    },
+
+    # ── Cross-cluster / Diverse Profiles ──
+    {
+        "student_id": "duke-harper",
+        "display_name": "Harper",
+        "journal_entries": [
+            {"text": "Theatre rehearsal was electric tonight. Our production of 'Rent' opens next week and the energy is contagious.", "mood_label": "excited", "tags": ["theater", "creativity", "Social"]},
+            {"text": "Singing in the a cappella group is my happy place. Harmonising with others is like emotional synchronisation.", "mood_label": "happy", "tags": ["singing", "music", "community"]},
+            {"text": "Nervous about the audition tomorrow but channelling that anxiety into preparation. Fear and excitement are the same feeling with different labels.", "mood_label": "anxious", "tags": ["theater", "Growth", "stress"]},
+        ],
+        "mood_checkins": [
+            {"mood_label": "excited", "energy_level": 8, "stress_level": 5, "social_battery": 9},
+            {"mood_label": "happy", "energy_level": 7, "stress_level": 3, "social_battery": 8, "notes": "A cappella joy"},
+            {"mood_label": "anxious", "energy_level": 6, "stress_level": 7, "social_battery": 5, "notes": "Audition nerves"},
+        ],
+        "activities": [
+            {"activity_type": "dance", "description": "Rent choreography rehearsal", "duration_mins": 120},
+            {"activity_type": "cooking", "description": "Cast dinner party", "duration_mins": 60},
+            {"activity_type": "yoga", "description": "Pre-show stretches", "duration_mins": 20},
         ],
     },
     {
-        "student_id": "demo-morgan",
-        "display_name": "Morgan",
+        "student_id": "duke-mason",
+        "display_name": "Mason",
         "journal_entries": [
-            {
-                "text": "Organised a poetry slam for the diversity week. Hearing people share their stories through verse was deeply moving. Poetry has this power to connect strangers at the soul level.",
-                "mood_label": "happy",
-                "tags": ["poetry", "community", "social justice"],
-            },
-            {
-                "text": "Dance rehearsal was tough but beautiful. We're performing a piece about migration and belonging. Art as activism — that's where my heart is.",
-                "mood_label": "reflective",
-                "tags": ["dance", "social justice", "creativity"],
-            },
-            {
-                "text": "Had a quiet morning journaling at the cafe. Sometimes I need to step back from all the activism and just be present with myself. Balance is everything.",
-                "mood_label": "calm",
-                "tags": ["mindfulness", "journaling", "self-care"],
-            },
+            {"text": "Lab experiment yielded unexpected results — the catalyst worked at half the temperature we predicted. Science is full of beautiful surprises.", "mood_label": "excited", "tags": ["chemistry", "research", "Growth"]},
+            {"text": "Quiet morning trail run and reading under a tree. Some days the best company is your own thoughts.", "mood_label": "calm", "tags": ["nature", "reading", "mindfulness"]},
+            {"text": "Meditation retreat this weekend. Learning to observe thoughts without attaching to them. It's changing how I do research — more patience, less ego.", "mood_label": "reflective", "tags": ["meditation", "research", "Reflection"]},
         ],
         "mood_checkins": [
-            {"mood_label": "happy", "energy_level": 7, "stress_level": 4, "social_battery": 8, "notes": "Poetry slam went great"},
-            {"mood_label": "calm", "energy_level": 5, "stress_level": 3, "social_battery": 4},
-            {"mood_label": "reflective", "energy_level": 6, "stress_level": 3, "social_battery": 6, "notes": "Good rehearsal"},
+            {"mood_label": "excited", "energy_level": 6, "stress_level": 4, "social_battery": 4, "notes": "Lab breakthrough"},
+            {"mood_label": "calm", "energy_level": 5, "stress_level": 1, "social_battery": 2},
+            {"mood_label": "reflective", "energy_level": 4, "stress_level": 2, "social_battery": 3, "notes": "Retreat insights"},
         ],
         "activities": [
-            {"activity_type": "dance", "description": "Migration piece rehearsal", "duration_mins": 90},
-            {"activity_type": "volunteering", "description": "Organised poetry slam", "duration_mins": 180},
-            {"activity_type": "journaling", "description": "Morning cafe reflection", "duration_mins": 30},
+            {"activity_type": "coding", "description": "Data analysis for lab results", "duration_mins": 120},
+            {"activity_type": "trail running", "description": "Solo morning run", "duration_mins": 40},
+            {"activity_type": "stargazing", "description": "Night sky observation", "duration_mins": 60},
+        ],
+    },
+    {
+        "student_id": "duke-ella",
+        "display_name": "Ella",
+        "journal_entries": [
+            {"text": "Fashion show planning is consuming my life but I love every second. Curating looks is visual storytelling.", "mood_label": "excited", "tags": ["fashion", "creativity", "photography"]},
+            {"text": "Roadtrip to the mountains for photography. Golden hour shots of the Blue Ridge were absolutely stunning.", "mood_label": "happy", "tags": ["photography", "travel", "Nature"]},
+            {"text": "Cooked brunch for friends and played my favourite playlist. Simple pleasures are the best pleasures.", "mood_label": "happy", "tags": ["cooking", "music", "Social"]},
+        ],
+        "mood_checkins": [
+            {"mood_label": "excited", "energy_level": 9, "stress_level": 4, "social_battery": 9, "notes": "Fashion show hype"},
+            {"mood_label": "happy", "energy_level": 8, "stress_level": 2, "social_battery": 7},
+            {"mood_label": "happy", "energy_level": 7, "stress_level": 2, "social_battery": 8, "notes": "Brunch vibes"},
+        ],
+        "activities": [
+            {"activity_type": "cooking", "description": "Sunday brunch spread", "duration_mins": 75},
+            {"activity_type": "yoga", "description": "Hot yoga class", "duration_mins": 60},
+            {"activity_type": "dance", "description": "Runway walk practice", "duration_mins": 45},
+        ],
+    },
+    {
+        "student_id": "duke-james",
+        "display_name": "James",
+        "journal_entries": [
+            {"text": "Solo backpacking trip to Crabtree Falls. 14 miles in silence — my favourite form of therapy. The waterfall at the summit was worth every step.", "mood_label": "calm", "tags": ["hiking", "nature", "mindfulness"]},
+            {"text": "Reading Marcus Aurelius' Meditations for the third time. Stoicism isn't about suppressing emotions — it's about choosing your response.", "mood_label": "reflective", "tags": ["philosophy", "reading", "Reflection"]},
+            {"text": "Painted the sunset from my dorm window. Quiet evenings are when I feel most alive.", "mood_label": "calm", "tags": ["nature", "creativity", "meditation"]},
+        ],
+        "mood_checkins": [
+            {"mood_label": "calm", "energy_level": 4, "stress_level": 1, "social_battery": 2},
+            {"mood_label": "reflective", "energy_level": 3, "stress_level": 2, "social_battery": 2, "notes": "Deep reading day"},
+            {"mood_label": "calm", "energy_level": 4, "stress_level": 1, "social_battery": 1, "notes": "Solo evening bliss"},
+        ],
+        "activities": [
+            {"activity_type": "trail running", "description": "Crabtree Falls hike", "duration_mins": 300},
+            {"activity_type": "reading", "description": "Stoic philosophy", "duration_mins": 90},
+            {"activity_type": "painting", "description": "Sunset watercolour", "duration_mins": 45},
+        ],
+    },
+    {
+        "student_id": "duke-scarlett",
+        "display_name": "Scarlett",
+        "journal_entries": [
+            {"text": "Led a campus cleanup at the Duke Gardens. 40 volunteers showed up! Small actions, collective impact. Climate hope is real.", "mood_label": "happy", "tags": ["sustainability", "community", "nature"]},
+            {"text": "Trail run through Duke Forest thinking about my environmental policy thesis. The forest itself is my research partner.", "mood_label": "reflective", "tags": ["nature", "sustainability", "fitness"]},
+            {"text": "Yoga and reading about regenerative agriculture. The solutions exist — we just need the will to implement them.", "mood_label": "calm", "tags": ["yoga", "reading", "sustainability"]},
+        ],
+        "mood_checkins": [
+            {"mood_label": "happy", "energy_level": 7, "stress_level": 3, "social_battery": 8, "notes": "Cleanup success!"},
+            {"mood_label": "reflective", "energy_level": 5, "stress_level": 4, "social_battery": 4},
+            {"mood_label": "calm", "energy_level": 6, "stress_level": 2, "social_battery": 3, "notes": "Hopeful reading"},
+        ],
+        "activities": [
+            {"activity_type": "volunteering", "description": "Duke Gardens cleanup", "duration_mins": 150},
+            {"activity_type": "trail running", "description": "Duke Forest thesis run", "duration_mins": 50},
+            {"activity_type": "yoga", "description": "Evening wind-down", "duration_mins": 30},
+        ],
+    },
+    {
+        "student_id": "duke-benjamin",
+        "display_name": "Benjamin",
+        "journal_entries": [
+            {"text": "Stock market simulation in finance class — my portfolio is up 15%. The adrenaline of reading market patterns is addictive.", "mood_label": "excited", "tags": ["finance", "entrepreneurship", "Growth"]},
+            {"text": "Basketball game was brutal. We were down 20 in the third quarter but fought back to lose by 3. Almost counts in horseshoes.", "mood_label": "frustrated", "tags": ["basketball", "fitness", "stress"]},
+            {"text": "Meal prepped healthy lunches for the week. Cooking is my underrated productivity hack.", "mood_label": "calm", "tags": ["cooking", "self-care"]},
+        ],
+        "mood_checkins": [
+            {"mood_label": "excited", "energy_level": 8, "stress_level": 5, "social_battery": 6, "notes": "Portfolio gains"},
+            {"mood_label": "frustrated", "energy_level": 7, "stress_level": 7, "social_battery": 6, "notes": "Close game loss"},
+            {"mood_label": "anxious", "energy_level": 6, "stress_level": 8, "social_battery": 4, "notes": "Exam week looming"},
+        ],
+        "activities": [
+            {"activity_type": "basketball", "description": "League game", "duration_mins": 90},
+            {"activity_type": "cooking", "description": "Weekly meal prep", "duration_mins": 75},
+            {"activity_type": "coding", "description": "Sport analytics dashboard", "duration_mins": 120},
         ],
     },
 ]

@@ -192,9 +192,9 @@ export default function OnboardingPage() {
             No schools match &quot;{schoolSearch}&quot;
           </div>
         ) : (
-          filteredSchools.map((school) => (
+          filteredSchools.map((school, idx) => (
             <button
-              key={school}
+              key={`${school}-${idx}`}
               onClick={() => {
                 setSelectedSchool(school);
                 setSchoolSearch("");

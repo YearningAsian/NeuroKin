@@ -80,6 +80,11 @@ function ChatWindow({
 
     // appendMessage already fires 'connections-updated' which will sync our state
     appendMessage(studentId, connection.peerId, msg);
+<<<<<<< HEAD
+=======
+    // Don't manually append — the "connections-updated" event listener
+    // will sync messages from localStorage to avoid duplicates.
+>>>>>>> dev
     setText("");
 
     // Simulate human typing delay
