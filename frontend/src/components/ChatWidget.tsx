@@ -29,6 +29,10 @@ function ChatWindow({
   const [text, setText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const hasUserSentMessage = messages.some(
+    (m) => m.sender === "user" || m.sender === "user_twin",
+  );
+  const showIcebreaker = Boolean(connection.icebreaker?.trim()) && !hasUserSentMessage;
 
   // Keep messages in sync with localStorage
   useEffect(() => {
@@ -116,6 +120,16 @@ function ChatWindow({
 
       {/* Messages */}
       <div ref={bodyRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-3 bg-[var(--color-surface-soft)]">
+        {showIcebreaker && (
+          <div className="bg-[var(--color-primary-light)] border border-amber-200 rounded-xl px-3 py-2">
+            <div className="text-[10px] font-semibold text-amber-800 uppercase tracking-wide">
+              Suggested icebreaker
+            </div>
+            <p className="text-xs text-amber-900 mt-1 leading-relaxed">
+              &ldquo;{connection.icebreaker}&rdquo;
+            </p>
+          </div>
+        )}
         {messages.map((m) => {
           const isMe = m.sender === "user_twin" || m.sender === "user";
           return (
