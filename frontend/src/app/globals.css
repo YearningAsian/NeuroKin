@@ -129,3 +129,19 @@ body {
 .stagger > *:nth-child(4) { animation-delay: 300ms; }
 .stagger > *:nth-child(5) { animation-delay: 400ms; }
 .stagger > *:nth-child(6) { animation-delay: 500ms; }
+
+/* Seamless horizontal marquee */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee var(--marquee-duration, 35s) linear infinite;
+}
+
+/* Confetti: pop up then fall down */
+@keyframes confetti-up-down {
+  0%   { opacity: 1; transform: translateY(0) translateX(0) rotate(0deg); }
+  20%  { opacity: 1; transform: translateY(var(--rise)) translateX(var(--sway)) rotate(90deg); }
+  100% { opacity: 0; transform: translateY(var(--fall)) translateX(var(--sway2)) rotate(var(--spin)); }
+}

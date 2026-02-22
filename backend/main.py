@@ -1,5 +1,5 @@
 """
-NeuroKin Backend
+NeuroTwin Backend
 ================
 Emotionally Intelligent Digital Twin System for Student Connection.
 
@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 import json
 import math
+import time
 import random
 import hashlib
 import logging
@@ -30,9 +31,24 @@ from enum import Enum
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
+
+try:
+    from cryptography.fernet import Fernet
+
+    _HAS_CRYPTO = True
+except ImportError:  # graceful fallback for dev environments
+    _HAS_CRYPTO = False
+
+try:
+    from langchain_core.runnables import RunnableLambda
+
+    _HAS_LANGCHAIN = True
+except ImportError:
+    _HAS_LANGCHAIN = False
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -40,17 +56,38 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("neurokin")
+logger = logging.getLogger("neurotwin")
 logging.getLogger("snowflake.connector").setLevel(logging.WARNING)
 
 DEMO_MODE = os.environ.get("DEMO_MODE", "1") == "1"
 ENABLE_CORTEX_EXPLANATIONS = os.environ.get("ENABLE_CORTEX_EXPLANATIONS", "0") == "1"
 
+# Fernet symmetric encryption for journal text at rest
+_ENCRYPTION_KEY = os.environ.get("ENCRYPTION_KEY", "")
+_fernet = Fernet(_ENCRYPTION_KEY.encode()) if _HAS_CRYPTO and _ENCRYPTION_KEY else None
+
+
+def _encrypt(text: str) -> str:
+    """Encrypt text with Fernet if a key is configured, else return plain."""
+    if _fernet:
+        return _fernet.encrypt(text.encode()).decode()
+    return text
+
+
+def _decrypt(ciphertext: str) -> str:
+    """Decrypt Fernet ciphertext if a key is configured, else return as-is."""
+    if _fernet:
+        try:
+            return _fernet.decrypt(ciphertext.encode()).decode()
+        except Exception:
+            return ciphertext  # already plain or different key
+    return ciphertext
+
 if not DEMO_MODE:
     import snowflake.connector  # only import when actually needed
 
 app = FastAPI(
-    title="NeuroKin API",
+    title="NeuroTwin API",
     description="Emotionally Intelligent Digital Twin System for Student Connection",
     version="0.1.0",
 )
@@ -61,6 +98,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class TimingMiddleware(BaseHTTPMiddleware):
+    """Log request duration for every endpoint."""
+
+    async def dispatch(self, request: Request, call_next):
+        start = time.perf_counter()
+        response = await call_next(request)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "%s %s → %d  %.0fms",
+            request.method,
+            request.url.path,
+            response.status_code,
+            elapsed_ms,
+        )
+        response.headers["X-Response-Time-Ms"] = f"{elapsed_ms:.1f}"
+        return response
+
+
+app.add_middleware(TimingMiddleware)
 
 # ---------------------------------------------------------------------------
 # Snowflake Connection Pool (production) / In-Memory Store (demo)
@@ -73,7 +131,12 @@ _demo_store: dict[str, dict] = {
     "mood_checkins": [],
     "twin_snapshots": {},
     "matches": [],
+    "blocks": [],
     "safety_reports": [],
+    "onboarding_responses": [],
+    "notifications": [],
+    "activities": [],
+    "consents": {},
 }
 
 # SQL constants
@@ -90,10 +153,10 @@ def _sf_connect():
         account=os.environ["SNOWFLAKE_ACCOUNT"],
         user=os.environ["SNOWFLAKE_USER"],
         password=os.environ["SNOWFLAKE_PASSWORD"],
-        database=os.environ.get("SNOWFLAKE_DATABASE", "NEUROKIN_DB"),
+        database=os.environ.get("SNOWFLAKE_DATABASE", "NEUROTWIN_DB"),
         schema=os.environ.get("SNOWFLAKE_SCHEMA", "PUBLIC"),
-        warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "NEUROKIN_WH"),
-        role=os.environ.get("SNOWFLAKE_ROLE", "NEUROKIN_APP_ROLE"),
+        warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE", "NEUROTWIN_WH"),
+        role=os.environ.get("SNOWFLAKE_ROLE", "NEUROTWIN_APP_ROLE"),
         client_session_keep_alive=True,
     )
 
@@ -263,6 +326,55 @@ class ReportPayload(BaseModel):
     student_id: str
     reported_id: str
     reason: str = Field(..., min_length=1, max_length=1000)
+
+
+class ActivityPayload(BaseModel):
+    """Payload for POST /activity."""
+    student_id: str
+    activity_type: str = Field(..., min_length=1, max_length=64)
+    description: Optional[str] = Field(None, max_length=500)
+    duration_mins: Optional[int] = Field(None, ge=1)
+
+
+class ConsentPayload(BaseModel):
+    """Payload for POST /consent."""
+    student_id: str
+    consented: bool = True
+
+
+class SignupPayload(BaseModel):
+    """Payload for POST /signup."""
+    student_id: str = Field(..., min_length=3, max_length=64, description="Unique username")
+    display_name: str = Field(..., min_length=1, max_length=128)
+    password: str = Field(..., min_length=4, max_length=128)
+    school: str = Field("", max_length=256, description="Selected school / university")
+
+
+class LoginPayload(BaseModel):
+    """Payload for POST /login."""
+    student_id: str
+    password: str
+
+
+def _hash_password(password: str) -> str:
+    """Hash a password with SHA-256 + salt for storage."""
+    salt = "neurotwin-salt-2026"  # In production, use per-user random salt
+    return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    """Check a password against its stored hash."""
+    return _hash_password(password) == stored_hash
+
+
+def _ensure_auth_columns() -> None:
+    """Ensure auth-related columns exist for older deployments."""
+    if DEMO_MODE:
+        return
+    try:
+        _execute("ALTER TABLE students ADD COLUMN IF NOT EXISTS password_hash VARCHAR(128)")
+    except Exception as exc:
+        logger.warning("Auth schema auto-migration skipped: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -676,23 +788,28 @@ class MatchRetrievalChain:
 
         # 2 — Candidate retrieval
         if DEMO_MODE:
+            # Gather blocked peer IDs
+            blocked_ids = {b["blocked_id"] for b in _demo_store["blocks"] if b["blocker_id"] == student_id}
             # In demo mode compute compatibility against all other twins in memory
             all_twins = [
                 t for sid, t in _demo_store["twin_snapshots"].items()
-                if sid != student_id
+                if sid != student_id and sid not in blocked_ids
             ]
         else:
             candidates = _execute(
                 """
-                SELECT *,
-                      VECTOR_COSINE_SIMILARITY(twin_embedding::VECTOR(FLOAT, 768), PARSE_JSON(%s)::VECTOR(FLOAT, 768)) AS vec_sim
-                FROM twin_snapshots
-                  WHERE student_id != %s
-                    AND twin_embedding IS NOT NULL
+                SELECT t.*,
+                      VECTOR_COSINE_SIMILARITY(t.twin_embedding::VECTOR(FLOAT, 768), PARSE_JSON(%s)::VECTOR(FLOAT, 768)) AS vec_sim
+                FROM twin_snapshots t
+                  WHERE t.student_id != %s
+                    AND t.twin_embedding IS NOT NULL
+                    AND t.student_id NOT IN (
+                        SELECT blocked_id FROM blocks WHERE blocker_id = %s
+                    )
                 ORDER BY vec_sim DESC
                 LIMIT %s
                 """,
-                (json.dumps(me.twin_embedding), student_id, top_k * 2),
+                (json.dumps(me.twin_embedding), student_id, student_id, top_k * 2),
                 fetch=True,
             )
             all_twins = [_row_to_twin(row) for row in candidates]
@@ -736,7 +853,7 @@ class ExplanationChain:
             result = _demo_explain(me.top_themes, peer.top_themes, shared, score)
             return result.get("explanation", ""), result.get("icebreaker", "")
 
-        prompt = f"""You are NeuroKin, an emotionally intelligent student connection assistant.
+        prompt = f"""You are NeuroTwin, an emotionally intelligent student connection assistant.
 Given two student profiles (no raw journal text), explain why they are a good match
 and suggest one engaging icebreaker question.
 
@@ -778,6 +895,34 @@ def _generate_explanation(me: TwinSnapshot, peer: TwinSnapshot, score: float, sh
             "What’s one thing you’re currently excited to learn or try?",
         )
     return ExplanationChain.run(me, peer, score, shared)
+
+
+# ---------------------------------------------------------------------------
+# LangChain Runnable Wrappers
+# ---------------------------------------------------------------------------
+# Expose each chain as a proper langchain-core Runnable so it can participate
+# in LangChain tracing, callbacks, and RunnableSequence composition.
+
+if _HAS_LANGCHAIN:
+    twin_builder_runnable = RunnableLambda(
+        lambda inputs: TwinBuilderChain.run(**inputs),
+    ).with_config({"run_name": "TwinBuilderChain"})
+
+    match_retrieval_runnable = RunnableLambda(
+        lambda inputs: MatchRetrievalChain.run(**inputs),
+    ).with_config({"run_name": "MatchRetrievalChain"})
+
+    explanation_runnable = RunnableLambda(
+        lambda inputs: ExplanationChain.run(**inputs),
+    ).with_config({"run_name": "ExplanationChain"})
+
+    # Full recommendation pipeline as a single Runnable
+    recommendation_pipeline = match_retrieval_runnable
+else:
+    twin_builder_runnable = None
+    match_retrieval_runnable = None
+    explanation_runnable = None
+    recommendation_pipeline = None
 
 
 def _anonymize(student_id: str) -> str:
@@ -826,15 +971,20 @@ def _row_to_twin(row: dict) -> TwinSnapshot:
 
 BOOTSTRAP_SQL = """
 CREATE TABLE IF NOT EXISTS students (
-    student_id     VARCHAR(64) PRIMARY KEY,
+    student_id     VARCHAR(64)  PRIMARY KEY,
     display_name   VARCHAR(128),
     email_hash     VARCHAR(128),
-    created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+    password_hash  VARCHAR(128),
+    onboarded      BOOLEAN      DEFAULT FALSE,
+    created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    updated_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
+ALTER TABLE students ADD COLUMN IF NOT EXISTS password_hash VARCHAR(128);
+
 CREATE TABLE IF NOT EXISTS journal_entries (
-    id             VARCHAR(64) DEFAULT UUID_STRING(),
-    student_id     VARCHAR(64) REFERENCES students(student_id),
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    student_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
     text_encrypted VARCHAR(16777216),
     mood_label     VARCHAR(32),
     tags           VARIANT,
@@ -843,9 +993,9 @@ CREATE TABLE IF NOT EXISTS journal_entries (
 );
 
 CREATE TABLE IF NOT EXISTS mood_checkins (
-    id             VARCHAR(64) DEFAULT UUID_STRING(),
-    student_id     VARCHAR(64) REFERENCES students(student_id),
-    mood_label     VARCHAR(32) NOT NULL,
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    student_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    mood_label     VARCHAR(32)  NOT NULL,
     energy_level   INT,
     stress_level   INT,
     social_battery INT,
@@ -853,24 +1003,34 @@ CREATE TABLE IF NOT EXISTS mood_checkins (
     created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
+CREATE TABLE IF NOT EXISTS activities (
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    student_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    activity_type  VARCHAR(64)  NOT NULL,
+    description    VARCHAR(500),
+    duration_mins  INT,
+    created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+
 CREATE TABLE IF NOT EXISTS twin_snapshots (
-    student_id            VARCHAR(64) PRIMARY KEY,
+    student_id            VARCHAR(64) PRIMARY KEY REFERENCES students(student_id),
     display_name          VARCHAR(128),
     twin_embedding        VARIANT,
     emotion_distribution  VARIANT,
     top_themes            VARIANT,
     activity_preferences  VARIANT,
-    mood_stability        FLOAT,
-    social_energy         FLOAT,
+    mood_stability        FLOAT      DEFAULT 0,
+    social_energy         FLOAT      DEFAULT 0,
     shared_values_tags    VARIANT,
-    schedule_overlap      FLOAT DEFAULT 0,
+    schedule_overlap      FLOAT      DEFAULT 0,
+    version               INT        DEFAULT 1,
     last_updated          TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
 CREATE TABLE IF NOT EXISTS matches (
-    id             VARCHAR(64) DEFAULT UUID_STRING(),
-    student_a      VARCHAR(64),
-    student_b      VARCHAR(64),
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    student_a      VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    student_b      VARCHAR(64)  NOT NULL REFERENCES students(student_id),
     score          FLOAT,
     explanation    VARCHAR(2000),
     icebreaker     VARCHAR(500),
@@ -878,12 +1038,44 @@ CREATE TABLE IF NOT EXISTS matches (
     created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
+CREATE TABLE IF NOT EXISTS blocks (
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    blocker_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    blocked_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+
 CREATE TABLE IF NOT EXISTS safety_reports (
-    id             VARCHAR(64) DEFAULT UUID_STRING(),
-    reporter_id    VARCHAR(64),
-    reported_id    VARCHAR(64),
-    reason         VARCHAR(1000),
-    resolved       BOOLEAN DEFAULT FALSE,
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    reporter_id    VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    reported_id    VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    reason         VARCHAR(1000) NOT NULL,
+    category       VARCHAR(32)  DEFAULT 'OTHER',
+    resolved       BOOLEAN      DEFAULT FALSE,
+    resolved_by    VARCHAR(64),
+    resolved_at    TIMESTAMP_NTZ,
+    created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+
+CREATE TABLE IF NOT EXISTS onboarding_responses (
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    student_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    selected_mood  VARCHAR(32),
+    energy_level   INT,
+    social_battery INT,
+    activities     VARIANT,
+    values         VARIANT,
+    journal_text   VARCHAR(5000),
+    completed_at   TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id             VARCHAR(64)  DEFAULT UUID_STRING() PRIMARY KEY,
+    student_id     VARCHAR(64)  NOT NULL REFERENCES students(student_id),
+    type           VARCHAR(32)  NOT NULL,
+    title          VARCHAR(256),
+    body           VARCHAR(1000),
+    read           BOOLEAN      DEFAULT FALSE,
     created_at     TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 """
@@ -961,6 +1153,14 @@ def _seed_demo_data():
     ]
 
     for p in profiles:
+        # Create student record with password (demo password = "demo")
+        _demo_store["students"][p["id"]] = {
+            "student_id": p["id"],
+            "display_name": p["name"],
+            "password_hash": _hash_password("demo"),
+            "onboarded": True,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
         # Build a pseudo-text to generate a deterministic embedding
         seed_text = f"{p['name']} cares about {', '.join(p['themes'][:3])}. " \
                     f"Values: {', '.join(p['values'])}. Activities: {', '.join(p['activities'])}."
@@ -1046,7 +1246,7 @@ async def post_journal(entry: JournalEntry):
             """,
             (
                 entry.student_id,
-                entry.text,
+                _encrypt(entry.text),
                 entry.mood_label.value if entry.mood_label else None,
                 json.dumps(entry.tags),
                 json.dumps(embedding),
@@ -1061,6 +1261,96 @@ async def post_journal(entry: JournalEntry):
 
     TwinBuilderChain.run(entry.student_id, entry.text, existing)
     return {"status": "ok", "twin_updated": True}
+
+
+@app.get("/journal", tags=["Ingestion"])
+async def get_journal_entries(student_id: str = Query(...), limit: int = Query(20, ge=1, le=100)):
+    """Retrieve past journal entries for a student (decrypted)."""
+    if DEMO_MODE:
+        entries = [
+            e for e in _demo_store["journal_entries"]
+            if e["student_id"] == student_id
+        ]
+        entries.sort(key=lambda e: e.get("created_at", ""), reverse=True)
+        return [
+            {
+                "text": e["text"][:120] + ("..." if len(e["text"]) > 120 else ""),
+                "mood_label": e.get("mood_label"),
+                "tags": e.get("tags", []),
+                "created_at": e.get("created_at"),
+            }
+            for e in entries[:limit]
+        ]
+    rows = _execute(
+        """
+        SELECT text_encrypted, mood_label, tags, created_at
+        FROM journal_entries
+        WHERE student_id = %s
+        ORDER BY created_at DESC
+        LIMIT %s
+        """,
+        (student_id, limit),
+        fetch=True,
+    )
+    results = []
+    for row in rows:
+        raw = _decrypt(row.get("text_encrypted", ""))
+        preview = raw[:120] + ("..." if len(raw) > 120 else "")
+        tags_val = row.get("tags")
+        if isinstance(tags_val, str):
+            try:
+                tags_val = json.loads(tags_val)
+            except json.JSONDecodeError:
+                tags_val = []
+        results.append({
+            "text": preview,
+            "mood_label": row.get("mood_label"),
+            "tags": tags_val or [],
+            "created_at": str(row.get("created_at", "")),
+        })
+    return results
+
+
+@app.get("/mood/history", tags=["Ingestion"])
+async def get_mood_history(student_id: str = Query(...), limit: int = Query(7, ge=1, le=30)):
+    """Retrieve recent mood check-ins for a student (for dashboard chart)."""
+    if DEMO_MODE:
+        checkins = [
+            c for c in _demo_store["mood_checkins"]
+            if c["student_id"] == student_id
+        ]
+        checkins.sort(key=lambda c: c.get("created_at", ""), reverse=True)
+        return [
+            {
+                "mood_label": c["mood_label"],
+                "energy_level": c.get("energy_level"),
+                "stress_level": c.get("stress_level"),
+                "social_battery": c.get("social_battery"),
+                "created_at": c.get("created_at"),
+            }
+            for c in checkins[:limit]
+        ]
+    rows = _execute(
+        """
+        SELECT mood_label, energy_level, stress_level, social_battery, created_at
+        FROM mood_checkins
+        WHERE student_id = %s
+        ORDER BY created_at DESC
+        LIMIT %s
+        """,
+        (student_id, limit),
+        fetch=True,
+    )
+    return [
+        {
+            "mood_label": row.get("mood_label"),
+            "energy_level": row.get("energy_level"),
+            "stress_level": row.get("stress_level"),
+            "social_battery": row.get("social_battery"),
+            "created_at": str(row.get("created_at", "")),
+        }
+        for row in rows
+    ]
 
 
 @app.post("/mood", tags=["Ingestion"])
@@ -1162,18 +1452,17 @@ async def post_feedback(payload: FeedbackPayload):
 async def post_block(payload: BlockPayload):
     """Block a peer — they will never appear in recommendations again."""
     record = {
-        "reporter_id": payload.student_id,
-        "reported_id": payload.blocked_id,
-        "reason": "BLOCK",
+        "blocker_id": payload.student_id,
+        "blocked_id": payload.blocked_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     if DEMO_MODE:
-        _demo_store["safety_reports"].append(record)
+        _demo_store["blocks"].append(record)
     else:
         _execute(
             """
-            INSERT INTO safety_reports (reporter_id, reported_id, reason)
-            VALUES (%s, %s, 'BLOCK')
+            INSERT INTO blocks (blocker_id, blocked_id)
+            VALUES (%s, %s)
             """,
             (payload.student_id, payload.blocked_id),
         )
@@ -1187,6 +1476,7 @@ async def post_report(payload: ReportPayload):
         "reporter_id": payload.student_id,
         "reported_id": payload.reported_id,
         "reason": payload.reason,
+        "category": "OTHER",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     if DEMO_MODE:
@@ -1194,12 +1484,234 @@ async def post_report(payload: ReportPayload):
     else:
         _execute(
             """
-            INSERT INTO safety_reports (reporter_id, reported_id, reason)
-            VALUES (%s, %s, %s)
+            INSERT INTO safety_reports (reporter_id, reported_id, reason, category)
+            VALUES (%s, %s, %s, 'OTHER')
             """,
             (payload.student_id, payload.reported_id, payload.reason),
         )
     return {"status": "ok"}
+
+
+@app.post("/activity", tags=["Ingestion"])
+async def post_activity(payload: ActivityPayload):
+    """Log a student activity (e.g. 'yoga', 'coding session')."""
+    record = {
+        "student_id": payload.student_id,
+        "activity_type": payload.activity_type,
+        "description": payload.description,
+        "duration_mins": payload.duration_mins,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if DEMO_MODE:
+        _demo_store["activities"].append(record)
+    else:
+        _ensure_student_exists(payload.student_id)
+        _execute(
+            """
+            INSERT INTO activities (student_id, activity_type, description, duration_mins)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (payload.student_id, payload.activity_type, payload.description, payload.duration_mins),
+        )
+    return {"status": "ok"}
+
+
+@app.post("/consent", tags=["Privacy"])
+async def post_consent(payload: ConsentPayload):
+    """Record a student's consent to data processing (required before first use)."""
+    if DEMO_MODE:
+        _demo_store["consents"][payload.student_id] = {
+            "consented": payload.consented,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    else:
+        _ensure_student_exists(payload.student_id)
+        _execute(
+            """
+            UPDATE students SET onboarded = %s, updated_at = CURRENT_TIMESTAMP()
+            WHERE student_id = %s
+            """,
+            (payload.consented, payload.student_id),
+        )
+    return {"status": "ok", "consented": payload.consented}
+
+
+@app.delete("/account", tags=["Privacy"])
+async def delete_account(student_id: str = Query(...)):
+    """
+    Opt-out: permanently delete all data for a student.
+    Removes journal entries, mood check-ins, twin snapshot, matches,
+    blocks, reports, activities, onboarding responses, and notifications.
+    """
+    if DEMO_MODE:
+        _demo_store["twin_snapshots"].pop(student_id, None)
+        _demo_store["consents"].pop(student_id, None)
+        for key in ["journal_entries", "mood_checkins", "matches", "blocks",
+                     "safety_reports", "onboarding_responses", "notifications", "activities"]:
+            _demo_store[key] = [r for r in _demo_store[key] if r.get("student_id") != student_id
+                                and r.get("student_a") != student_id and r.get("blocker_id") != student_id
+                                and r.get("reporter_id") != student_id]
+        _demo_store["students"].pop(student_id, None)
+    else:
+        # Order matters: delete referencing rows first, then the student
+        for stmt in [
+            "DELETE FROM notifications WHERE student_id = %s",
+            "DELETE FROM onboarding_responses WHERE student_id = %s",
+            "DELETE FROM activities WHERE student_id = %s",
+            "DELETE FROM blocks WHERE blocker_id = %s OR blocked_id = %s",
+            "DELETE FROM safety_reports WHERE reporter_id = %s OR reported_id = %s",
+            "DELETE FROM matches WHERE student_a = %s OR student_b = %s",
+            "DELETE FROM mood_checkins WHERE student_id = %s",
+            "DELETE FROM journal_entries WHERE student_id = %s",
+            "DELETE FROM twin_snapshots WHERE student_id = %s",
+        ]:
+            # Some statements reference student_id twice
+            param_count = stmt.count("%s")
+            _execute(stmt, tuple([student_id] * param_count))
+        _execute("DELETE FROM students WHERE student_id = %s", (student_id,))
+    return {"status": "ok", "deleted": student_id}
+
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+
+@app.post("/signup", tags=["Auth"])
+async def signup(payload: SignupPayload):
+    """
+    Create a new student account.
+    Returns the student_id + display_name on success.
+    """
+    pw_hash = _hash_password(payload.password)
+    is_demo_repair = payload.student_id.startswith("demo-") and payload.password == "demo"
+
+    if DEMO_MODE:
+        if payload.student_id in _demo_store.get("students", {}):
+            if not is_demo_repair:
+                raise HTTPException(409, "Account already exists.")
+            _demo_store["students"][payload.student_id].update({
+                "display_name": payload.display_name,
+                "password_hash": pw_hash,
+            })
+            return {
+                "status": "ok",
+                "student_id": payload.student_id,
+                "display_name": payload.display_name,
+            }
+        _demo_store["students"][payload.student_id] = {
+            "student_id": payload.student_id,
+            "display_name": payload.display_name,
+            "password_hash": pw_hash,
+            "school": payload.school,
+            "onboarded": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+    else:
+        _ensure_auth_columns()
+        # Check if already exists
+        existing = _execute(
+            "SELECT student_id FROM students WHERE student_id = %s",
+            (payload.student_id,),
+            fetch=True,
+        )
+        if existing:
+            if not is_demo_repair:
+                raise HTTPException(409, "Account already exists.")
+            try:
+                _execute(
+                    """
+                    UPDATE students
+                    SET display_name = %s, password_hash = %s, updated_at = CURRENT_TIMESTAMP()
+                    WHERE student_id = %s
+                    """,
+                    (payload.display_name, pw_hash, payload.student_id),
+                )
+            except Exception as exc:
+                if "PASSWORD_HASH" in str(exc).upper() and "INVALID IDENTIFIER" in str(exc).upper():
+                    _execute(
+                        """
+                        UPDATE students
+                        SET display_name = %s, email_hash = %s, updated_at = CURRENT_TIMESTAMP()
+                        WHERE student_id = %s
+                        """,
+                        (payload.display_name, pw_hash, payload.student_id),
+                    )
+                else:
+                    raise
+            return {
+                "status": "ok",
+                "student_id": payload.student_id,
+                "display_name": payload.display_name,
+            }
+        try:
+            _execute(
+                """
+                INSERT INTO students (student_id, display_name, email_hash, password_hash, school, onboarded)
+                VALUES (%s, %s, '', %s, %s, FALSE)
+                """,
+                (payload.student_id, payload.display_name, pw_hash, payload.school),
+            )
+        except Exception as exc:
+            if "PASSWORD_HASH" in str(exc).upper() and "INVALID IDENTIFIER" in str(exc).upper():
+                _ensure_auth_columns()
+                _execute(
+                    """
+                    INSERT INTO students (student_id, display_name, email_hash, school, onboarded)
+                    VALUES (%s, %s, %s, %s, FALSE)
+                    """,
+                    (payload.student_id, payload.display_name, pw_hash, payload.school),
+                )
+            else:
+                raise
+
+    return {
+        "status": "ok",
+        "student_id": payload.student_id,
+        "display_name": payload.display_name,
+    }
+
+
+@app.post("/login", tags=["Auth"])
+async def login(payload: LoginPayload):
+    """
+    Authenticate a student. Returns student info on success.
+    """
+    pw_hash = _hash_password(payload.password)
+
+    if DEMO_MODE:
+        student = _demo_store.get("students", {}).get(payload.student_id)
+        if not student or student.get("password_hash") != pw_hash:
+            raise HTTPException(401, "Invalid credentials.")
+        return {
+            "status": "ok",
+            "student_id": payload.student_id,
+            "display_name": student.get("display_name", payload.student_id),
+        }
+    else:
+        _ensure_auth_columns()
+        try:
+            rows = _execute(
+                "SELECT student_id, display_name, password_hash FROM students WHERE student_id = %s",
+                (payload.student_id,),
+                fetch=True,
+            )
+        except Exception as exc:
+            if "PASSWORD_HASH" in str(exc).upper() and "INVALID IDENTIFIER" in str(exc).upper():
+                _ensure_auth_columns()
+                rows = _execute(
+                    "SELECT student_id, display_name, email_hash AS password_hash FROM students WHERE student_id = %s",
+                    (payload.student_id,),
+                    fetch=True,
+                )
+            else:
+                raise
+        if not rows or rows[0].get("password_hash") != pw_hash:
+            raise HTTPException(401, "Invalid credentials.")
+        return {
+            "status": "ok",
+            "student_id": rows[0]["student_id"],
+            "display_name": rows[0].get("display_name", payload.student_id),
+        }
 
 
 # ---------------------------------------------------------------------------

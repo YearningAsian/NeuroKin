@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Toast } from "@/components/ui/Toast";
-import { BookHeart, Send, Lock, Clock, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { submitJournal } from "@/lib/api";
-import { DEMO_STUDENT_ID } from "@/lib/user";
+import { BookHeart, Send, Lock, Clock, Loader2, Mic, MicOff } from "lucide-react";
+import { submitJournal, getJournalEntries, type JournalEntryPreview } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { useFetch } from "@/hooks/useFetch";
 
 const prompts = [
   "What's been on your mind today?",
@@ -19,47 +20,109 @@ const prompts = [
   "What would make tomorrow great?",
 ];
 
-const pastEntries = [
-  {
-    date: "Today, 2:30 PM",
-    preview: "I've been thinking about how much better I feel when I take time to...",
-    mood: "😌",
-    themes: ["Reflection", "Gratitude"],
-  },
-  {
-    date: "Yesterday, 9:15 PM",
-    preview: "Had a really interesting conversation in class today about...",
-    mood: "😊",
-    themes: ["Social", "Growth"],
-  },
-  {
-    date: "Feb 19, 4:00 PM",
-    preview: "Feeling a bit overwhelmed with deadlines but I know I can...",
-    mood: "😰",
-    themes: ["Stress", "Resilience"],
-  },
-];
+const MOOD_EMOJI: Record<string, string> = {
+  happy: "😊",
+  calm: "😌",
+  sad: "😔",
+  frustrated: "😤",
+  anxious: "😰",
+  reflective: "🤔",
+  tired: "😴",
+  excited: "🤩",
+};
+
+type SpeechRecognitionResultItem = {
+  transcript: string;
+};
+
+type SpeechRecognitionEventLike = {
+  results: ArrayLike<ArrayLike<SpeechRecognitionResultItem>>;
+};
+
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
 
 export default function JournalPage() {
+  const { user } = useAuth();
+  const studentId = user?.studentId ?? "";
   const [text, setText] = useState("");
-  const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [entriesLimit, setEntriesLimit] = useState(5);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const speechSupported =
+    typeof window !== "undefined" &&
+    !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  const fetcher = useCallback(
+    () => getJournalEntries(studentId, entriesLimit),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [refreshKey, studentId, entriesLimit],
+  );
+  const { data: entries, loading: entriesLoading } = useFetch(fetcher);
 
   const handleSubmit = async () => {
     if (!text.trim() || submitting) return;
     setSubmitting(true);
     try {
-      await submitJournal({ student_id: DEMO_STUDENT_ID, text });
+      await submitJournal({ student_id: studentId, text });
       setSubmitted(true);
       setTimeout(() => setSubmitted(false), 3000);
       setText("");
-      setSelectedPrompt(null);
+      // Refresh entries list
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       console.error("Journal submit failed:", err);
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const toggleListening = () => {
+    if (typeof window === "undefined") return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript?.trim();
+      if (transcript) {
+        setText((prev) => (prev.trim() ? `${prev}\n${transcript}` : transcript));
+      }
+    };
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    setIsListening(true);
+    recognition.start();
   };
 
   return (
@@ -68,32 +131,40 @@ export default function JournalPage() {
         icon={BookHeart}
         iconColor="text-[var(--color-warm)]"
         title="Journal"
-        description="Write freely. Your entries are encrypted and shape your Emotional Twin."
+        description="Write or speak freely. Your entries are encrypted and shape your Emotional Twin."
       />
 
       {/* Journal prompts */}
       <div className="animate-fade-in-up">
         <p className="text-sm font-medium text-[var(--color-text-muted)] mb-3">
-          Need a prompt? Try one of these:
+          Suggestions:
         </p>
-        <div className="flex flex-wrap gap-2">
-          {prompts.map((p) => (
-            <button
-              key={p}
-              onClick={() => {
-                setSelectedPrompt(p);
-                setText(p + "\n\n");
-              }}
-              className={cn(
-                "text-sm px-4 py-2 rounded-full border transition-all",
-                selectedPrompt === p
-                  ? "bg-[var(--color-primary-light)] border-[var(--color-primary)] text-[var(--color-text)]"
-                  : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-primary)] hover:bg-amber-50"
-              )}
-            >
-              {p}
-            </button>
-          ))}
+        <div
+          className="overflow-hidden select-none pointer-events-none"
+          style={{ maskImage: "linear-gradient(to right, transparent, black 4%, black 96%, transparent)" }}
+        >
+          <div className="flex w-max animate-marquee" style={{ ["--marquee-duration" as string]: "40s" }}>
+            <div className="flex gap-3 shrink-0 pr-3">
+              {prompts.map((p) => (
+                <div
+                  key={p}
+                  className="text-sm px-4 py-2 rounded-full border border-[var(--color-border)] text-[var(--color-text-muted)] bg-white/70 whitespace-nowrap"
+                >
+                  {p}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 shrink-0 pr-3" aria-hidden>
+              {prompts.map((p) => (
+                <div
+                  key={`dup-${p}`}
+                  className="text-sm px-4 py-2 rounded-full border border-[var(--color-border)] text-[var(--color-text-muted)] bg-white/70 whitespace-nowrap"
+                >
+                  {p}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -104,7 +175,7 @@ export default function JournalPage() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={8}
-            placeholder="Start writing... What's on your mind?"
+            placeholder="Start writing or speaking... What's on your mind?"
             className="w-full text-base leading-relaxed resize-none border-0 outline-none placeholder:text-slate-300 bg-transparent"
           />
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-[var(--color-border)]">
@@ -113,6 +184,16 @@ export default function JournalPage() {
               Encrypted & private
             </div>
             <div className="flex items-center gap-3">
+              {speechSupported && (
+                <Button
+                  onClick={toggleListening}
+                  variant={isListening ? "secondary" : "outline"}
+                  size="sm"
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  {isListening ? "Stop" : "Speak"}
+                </Button>
+              )}
               <span className="text-xs text-[var(--color-text-muted)]">
                 {text.length} characters
               </span>
@@ -136,35 +217,78 @@ export default function JournalPage() {
         onDismiss={() => setSubmitted(false)}
       />
 
-      {/* Past entries */}
+      {/* Past entries (real data from API) */}
       <div className="animate-fade-in-up">
-        <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <Clock className="w-5 h-5 text-[var(--color-text-muted)]" />
-          Recent Entries
-        </h2>
-        <div className="space-y-3">
-          {pastEntries.map((entry) => (
-            <Card key={entry.date} className="card-hover cursor-pointer">
-              <CardContent className="flex items-start gap-4 py-4">
-                <div className="text-2xl mt-1">{entry.mood}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-[var(--color-text-muted)] mb-1">{entry.date}</div>
-                  <p className="text-sm text-[var(--color-text)] truncate">{entry.preview}</p>
-                  <div className="flex gap-1.5 mt-2">
-                    {entry.themes.map((t) => (
-                      <span
-                        key={t}
-                        className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-[var(--color-text-muted)]"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <Clock className="w-5 h-5 text-[var(--color-text-muted)]" />
+            {entriesLimit > 5 ? "All Entries" : "Recent Entries"}
+          </h2>
+          {entriesLimit <= 5 && (
+            <Button variant="ghost" size="sm" onClick={() => setEntriesLimit(100)}>
+              View all entries
+            </Button>
+          )}
         </div>
+        {entriesLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardContent className="flex items-start gap-4 py-4 animate-pulse">
+                  <div className="w-8 h-8 rounded-full bg-slate-200 mt-1" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-24 bg-slate-200 rounded" />
+                    <div className="h-4 w-full bg-slate-200 rounded" />
+                    <div className="flex gap-1.5">
+                      <div className="h-5 w-14 bg-slate-200 rounded-full" />
+                      <div className="h-5 w-16 bg-slate-200 rounded-full" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (!entries || entries.length === 0) ? (
+          <EmptyState
+            icon={BookHeart}
+            title="No entries yet"
+            description="Write your first journal entry above to get started."
+          />
+        ) : (
+          <div className="space-y-3">
+            {entries.map((entry: JournalEntryPreview, idx: number) => (
+              <Card key={idx} className="card-hover">
+                <CardContent className="flex items-start gap-4 py-4">
+                  <div className="text-2xl mt-1">
+                    {MOOD_EMOJI[entry.mood_label ?? ""] ?? "📝"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-[var(--color-text-muted)] mb-1">
+                      {entry.created_at
+                        ? new Date(entry.created_at).toLocaleString()
+                        : "Recent"}
+                    </div>
+                    <p className="text-sm text-[var(--color-text)] truncate">
+                      {entry.text}
+                    </p>
+                    {entry.tags.length > 0 && (
+                      <div className="flex gap-1.5 mt-2">
+                        {entry.tags.slice(0, 4).map((t) => (
+                          <span
+                            key={t}
+                            className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-[var(--color-text-muted)]"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

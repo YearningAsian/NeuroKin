@@ -8,39 +8,127 @@ import {
   Shield,
   Sparkles,
   Users,
-  BookHeart,
   ArrowRight,
-  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  BookOpen,
+  Activity,
+  Star,
 } from "lucide-react";
+import {
+  motion,
+  useScroll,
+  useTransform,
+  useInView,
+  AnimatePresence,
+} from "framer-motion";
+import {
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+  type ComponentType,
+  type FormEvent,
+  type RefObject,
+  type ReactNode,
+  type SVGProps,
+} from "react";
+
+/* ─────────────────────── DATA ─────────────────────── */
+
+const DICEBEAR_BASE = "https://api.dicebear.com/9.x/thumbs/svg";
+const heroSeed = "neurotwin-hero";
+
+type TwinFactor = {
+  label: string;
+  description: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  color: string;
+  angle: number;
+  bubbleShift?: { x?: number; y?: number };
+  tailShift?: { dx?: number; dy?: number };
+};
+
+const twinFactors: TwinFactor[] = [
+  {
+    label: "Emotional Patterns",
+    description: "How you feel day-to-day",
+    icon: Heart,
+    color: "#f43f5e",
+    angle: -90,
+    bubbleShift: { x: -90, y: -30 },
+        tailShift: { dx: 80 },
+  },
+  {
+    label: "Journal Reflections",
+    description: "Your personal thoughts",
+    icon: BookOpen,
+    color: "#f59e0b",
+    angle: -18,
+    bubbleShift: { x: -20, y: -40 },
+    tailShift: { dx: -10 },
+  },
+  {
+    label: "Daily Activities",
+    description: "What you spend time on",
+    icon: Activity,
+    color: "#3b82f6",
+    angle: 54,
+    bubbleShift: { x: -70, y: 10 },
+    tailShift: { dx: -10 },
+  },
+  {
+    label: "Core Values",
+    description: "What matters most to you",
+    icon: Star,
+    color: "#8b5cf6",
+    angle: 126,
+    bubbleShift: { x: -130, y: -10 },
+    tailShift: { dx: -10 },
+  },
+  {
+    label: "Social Energy",
+    description: "How you connect with others",
+    icon: Users,
+    color: "#10b981",
+    angle: 198,
+    bubbleShift: { x: -200, y: -20 },
+    tailShift: { dx: -10 },
+  },
+];
 
 const features = [
   {
     icon: Brain,
     title: "Emotional Digital Twin",
     description:
-      "We build a dynamic emotional profile from your journals, moods, and activities — your evolving digital twin.",
-    color: "bg-amber-100 text-amber-700",
+      "We build a dynamic emotional profile from your journals, moods, and activities — your evolving digital twin that grows with you.",
+    color: "from-amber-400 to-orange-500",
+    bg: "bg-amber-50",
   },
   {
     icon: Heart,
     title: "Deep Compatibility",
     description:
-      "Matching goes beyond shared classes. We measure emotional resonance, coping styles, and social energy.",
-    color: "bg-rose-100 text-rose-600",
+      "Matching goes beyond shared classes. We measure emotional resonance, coping styles, and social energy for real connections.",
+    color: "from-rose-400 to-pink-500",
+    bg: "bg-rose-50",
   },
   {
     icon: Users,
     title: "Meaningful Connections",
     description:
-      "Get paired with peers who truly get you. Only connections above 50% compatibility are shown.",
-    color: "bg-blue-100 text-blue-600",
+      "Get paired with peers who truly get you. Only connections above 50% compatibility are shown — quality over quantity.",
+    color: "from-blue-400 to-indigo-500",
+    bg: "bg-blue-50",
   },
   {
     icon: Shield,
     title: "Privacy First",
     description:
-      "Your raw journals are never shared. We use encrypted, privacy-preserving AI to keep your data safe.",
-    color: "bg-emerald-100 text-emerald-700",
+      "Your raw journals are never shared. We use encrypted, privacy-preserving AI to keep your data safe at every step.",
+    color: "from-emerald-400 to-teal-500",
+    bg: "bg-emerald-50",
   },
 ];
 
@@ -50,368 +138,869 @@ const howItWorks = [
     title: "Journal & Check In",
     description:
       "Write about your day, check in your mood, or log activities. It only takes a minute.",
+    icon: BookOpen,
+    seed: "step-journal",
   },
   {
     step: "02",
     title: "Your Twin Evolves",
     description:
       "AI builds your Emotional Digital Twin — a rich, nuanced understanding of who you are.",
+    icon: Brain,
+    seed: "step-twin",
   },
   {
     step: "03",
     title: "Find Your People",
     description:
-      "NeuroKin matches you with emotionally compatible peers and gives you a personalized icebreaker.",
+      "NeuroTwin matches you with emotionally compatible peers and gives you a personalized icebreaker.",
+    icon: Users,
+    seed: "step-match",
   },
 ];
 
-const categories = [
-  { label: "Stress less", emoji: "🌿" },
-  { label: "Find connection", emoji: "🤝" },
-  { label: "Process thoughts", emoji: "💭" },
-  { label: "Build confidence", emoji: "✨" },
-  { label: "Manage anxiety", emoji: "🌊" },
-  { label: "Grow together", emoji: "🌱" },
+const testimonials = [
+  {
+    quote:
+      "I finally found someone who gets how I feel about school pressure. We journal together now.",
+    label: "On finding an emotionally compatible peer",
+    seed: "sarah",
+    name: "Sarah K.",
+  },
+  {
+    quote:
+      "The icebreakers actually made sense — it wasn't awkward at all starting a conversation.",
+    label: "On AI-generated icebreakers",
+    seed: "alex",
+    name: "Alex T.",
+  },
+  {
+    quote:
+      "Knowing my journals are private but still help me connect makes me feel safe.",
+    label: "On privacy-first design",
+    seed: "maya",
+    name: "Maya R.",
+  },
+  {
+    quote:
+      "I love how my twin evolves — it really captures who I'm becoming, not just who I was.",
+    label: "On the evolving digital twin",
+    seed: "jordan",
+    name: "Jordan L.",
+  },
+  {
+    quote:
+      "Within a week I had three genuine connections. This beats every other social app.",
+    label: "On meaningful peer matching",
+    seed: "riley",
+    name: "Riley P.",
+  },
 ];
 
-export default function LandingPage() {
+/* ─────────────────── HELPER COMPONENTS ─────────────────── */
+
+function FadeInWhenVisible({
+  children,
+  delay = 0,
+  direction = "up",
+  className = "",
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  direction?: "up" | "down" | "left" | "right";
+  className?: string;
+}) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-80px" });
+
+  const dirMap = {
+    up: { y: 60, x: 0 },
+    down: { y: -60, x: 0 },
+    left: { x: 60, y: 0 },
+    right: { x: -60, y: 0 },
+  };
+
   return (
-    <div className="min-h-screen">
-      {/* Top banner */}
-      <div className="bg-[var(--color-primary)] text-center py-2 text-sm font-medium text-white">
-        NeuroKin — Emotionally intelligent student connections →
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, ...dirMap[direction] }}
+      animate={
+        isInView
+          ? { opacity: 1, y: 0, x: 0 }
+          : { opacity: 0, ...dirMap[direction] }
+      }
+      transition={{ duration: 0.7, delay, ease: [0.25, 0.4, 0.25, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/* ── Thought Cloud (floating factor bubble) ── */
+function ThoughtCloud({
+  factor,
+  index,
+  radius,
+}: {
+  factor: TwinFactor;
+  index: number;
+  radius: number;
+}) {
+  const Icon = factor.icon;
+  const rad = (factor.angle * Math.PI) / 180;
+  const cx = Math.cos(rad) * radius;
+  const cy = Math.sin(rad) * radius;
+  const shiftX = factor.bubbleShift?.x ?? 0;
+  const shiftY = factor.bubbleShift?.y ?? 0;
+
+  // Determine which side the cloud is relative to center for tail placement
+  const isRight = cx > 0;
+  const tailDx = factor.tailShift?.dx ?? 0;
+  const tailDy = factor.tailShift?.dy ?? 0;
+
+  return (
+    <motion.div
+      className="absolute z-20 pointer-events-auto"
+      style={{
+        left: `calc(50% + ${cx + shiftX}px)`,
+        top: `calc(50% + ${cy + shiftY}px)`,
+        transform: "translate(-50%, -50%)",
+      }}
+      initial={{ opacity: 0, scale: 0 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{
+        duration: 0.5,
+        delay: 0.9 + index * 0.15,
+        ease: [0.34, 1.56, 0.64, 1],
+      }}
+    >
+      {/* The cloud bubble */}
+      <motion.div
+        className="relative bg-white rounded-[24px] px-4 py-3 min-w-[150px] md:min-w-[170px] cursor-default select-none"
+        style={{
+          boxShadow: `0 8px 30px ${factor.color}18, 0 2px 10px rgba(0,0,0,0.06)`,
+          border: `1.5px solid ${factor.color}20`,
+        }}
+        whileHover={{ scale: 1.08, y: -4 }}
+        animate={{ y: [0, -7, 0] }}
+        transition={{
+          y: {
+            duration: 3.5 + index * 0.4,
+            repeat: Infinity,
+            ease: "easeInOut",
+          },
+        }}
+      >
+        {/* Cloud tail dots — pointing inward toward the center thumb */}
+        <div
+          className="absolute w-3.5 h-3.5 rounded-full bg-white"
+          style={{
+            border: `1.5px solid ${factor.color}20`,
+            bottom: cy > 0 ? "auto" : -10 + tailDy,
+            top: cy > 0 ? -10 + tailDy : "auto",
+            left: isRight ? 24 + tailDx : "auto",
+            right: !isRight ? 24 + tailDx : "auto",
+            boxShadow: `0 2px 6px ${factor.color}12`,
+          }}
+        />
+        <div
+          className="absolute w-2 h-2 rounded-full bg-white"
+          style={{
+            border: `1.5px solid ${factor.color}20`,
+            bottom: cy > 0 ? "auto" : -18 + tailDy,
+            top: cy > 0 ? -18 + tailDy : "auto",
+            left: isRight ? 18 + tailDx : "auto",
+            right: !isRight ? 18 + tailDx : "auto",
+            boxShadow: `0 1px 4px ${factor.color}10`,
+          }}
+        />
+
+        {/* Content */}
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: `${factor.color}14` }}
+          >
+            <Icon className="w-4 h-4" style={{ color: factor.color }} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[13px] font-semibold text-slate-800 leading-tight">
+              {factor.label}
+            </div>
+            <div className="text-[11px] text-slate-400 leading-tight mt-0.5">
+              {factor.description}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ── Dashed connector lines from clouds to center ── */
+function ConnectorLines({ radius }: { radius: number }) {
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none z-[5]"
+      viewBox="0 0 700 700"
+    >
+      {twinFactors.map((f, i) => {
+        const rad = (f.angle * Math.PI) / 180;
+        const innerRadius = 110;
+        const outerRadius = Math.max(radius - 40, innerRadius + 35);
+        const outerX = 350 + Math.cos(rad) * outerRadius;
+        const outerY = 350 + Math.sin(rad) * outerRadius;
+        const innerX = 350 + Math.cos(rad) * innerRadius;
+        const innerY = 350 + Math.sin(rad) * innerRadius;
+
+        return (
+          <motion.line
+            key={i}
+            x1={innerX}
+            y1={innerY}
+            x2={outerX}
+            y2={outerY}
+            stroke={f.color}
+            strokeWidth="2"
+            strokeDasharray="8 6"
+            strokeLinecap="round"
+            opacity="0.3"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 0.3 }}
+            transition={{ duration: 1, delay: 1.2 + i * 0.12 }}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ── Testimonial Carousel ── */
+function Carousel() {
+  const [current, setCurrent] = useState(0);
+  const [dir, setDir] = useState(0);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const go = useCallback((d: number) => {
+    setDir(d);
+    setCurrent((p) => (p + d + testimonials.length) % testimonials.length);
+  }, []);
+
+  useEffect(() => {
+    timer.current = setInterval(() => go(1), 5000);
+    return () => {
+      if (timer.current) clearInterval(timer.current);
+    };
+  }, [go]);
+
+  const variants = {
+    enter: (d: number) => ({ x: d > 0 ? 280 : -280, opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (d: number) => ({ x: d > 0 ? -280 : 280, opacity: 0 }),
+  };
+
+  const t = testimonials[current];
+
+  return (
+    <div className="relative max-w-2xl mx-auto">
+      <div className="overflow-hidden rounded-3xl bg-white border border-slate-100 shadow-xl min-h-[260px] flex items-center px-8 py-10 md:px-14">
+        <AnimatePresence mode="wait" custom={dir}>
+          <motion.div
+            key={current}
+            custom={dir}
+            variants={variants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.4, ease: [0.25, 0.4, 0.25, 1] }}
+            className="flex flex-col items-center text-center gap-5 w-full"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`${DICEBEAR_BASE}?seed=${t.seed}&backgroundColor=f1f5f9&radius=50`}
+              alt={t.name}
+              className="w-16 h-16 rounded-full border-2 border-slate-100"
+            />
+            <p className="text-lg md:text-xl leading-relaxed text-slate-700 font-medium">
+              &ldquo;{t.quote}&rdquo;
+            </p>
+            <div>
+              <div className="font-semibold text-slate-800">{t.name}</div>
+              <div className="text-sm text-slate-400">{t.label}</div>
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-[var(--color-border)]">
+      {/* Navigation */}
+      <div className="flex items-center justify-center gap-4 mt-6">
+        <button
+          onClick={() => go(-1)}
+          className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm"
+          aria-label="Previous testimonial"
+        >
+          <ChevronLeft className="w-5 h-5 text-slate-600" />
+        </button>
+        <div className="flex gap-2">
+          {testimonials.map((_, i) => (
+            <button
+              key={i}
+              aria-label={`Go to testimonial ${i + 1}`}
+              onClick={() => {
+                setDir(i > current ? 1 : -1);
+                setCurrent(i);
+              }}
+              className={`h-2.5 rounded-full transition-all duration-300 ${
+                i === current
+                  ? "bg-[var(--color-primary)] w-7"
+                  : "bg-slate-200 hover:bg-slate-300 w-2.5"
+              }`}
+            />
+          ))}
+        </div>
+        <button
+          onClick={() => go(1)}
+          className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm"
+          aria-label="Next testimonial"
+        >
+          <ChevronRight className="w-5 h-5 text-slate-600" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────── PARALLAX HOOK ─────────────── */
+function useParallax(
+  ref: React.RefObject<HTMLElement | null>,
+  distance: number
+) {
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"],
+  });
+  return useTransform(scrollYProgress, [0, 1], [-distance, distance]);
+}
+
+/* ═══════════════════ MAIN PAGE ═══════════════════ */
+
+export default function LandingPage() {
+  const heroRef = useRef<HTMLElement>(null);
+  const heroY = useParallax(heroRef, 50);
+
+  const scrollToSection = useCallback((id: string) => {
+    if (typeof window === "undefined") return;
+    const target = document.getElementById(id);
+    if (!target) return;
+
+    const headerOffset = 76;
+    const getTop = () => target.getBoundingClientRect().top + window.scrollY - headerOffset;
+    const top = Math.max(0, getTop());
+
+    window.history.replaceState(null, "", `#${id}`);
+    window.scrollTo({ top, behavior: "smooth" });
+
+    window.setTimeout(() => {
+      const correctedTop = Math.max(0, getTop());
+      if (Math.abs(window.scrollY - correctedTop) > 2) {
+        window.scrollTo({ top: correctedTop, behavior: "smooth" });
+      }
+    }, 420);
+  }, []);
+
+  /* Responsive radius for the thought cloud orbit */
+  const [cloudRadius, setCloudRadius] = useState(210);
+  useEffect(() => {
+    const update = () => setCloudRadius(window.innerWidth < 768 ? 140 : 210);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  return (
+    <main className="min-h-screen bg-white">
+      {/* ──── HEADER ──── */}
+      <motion.header
+        className="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-xl border-b border-slate-100/60"
+        initial={{ y: -80 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      >
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-warm)] flex items-center justify-center">
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-warm)] flex items-center justify-center shadow-md">
               <Brain className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold">
-              Neuro<span className="text-[var(--color-primary)]">Kin</span>
+            <span className="text-xl font-bold tracking-tight">
+              Neuro<span className="text-[var(--color-primary)]">Twin</span>
             </span>
           </Link>
-          <div className="hidden md:flex items-center gap-6 text-sm text-[var(--color-text-muted)]">
-            <a href="#features" className="hover:text-[var(--color-text)]">Features</a>
-            <a href="#how-it-works" className="hover:text-[var(--color-text)]">How It Works</a>
-            <a href="#safety" className="hover:text-[var(--color-text)]">Safety</a>
-          </div>
           <div className="flex items-center gap-3">
-            <Link href="/dashboard">
+            <Link href="/login">
               <Button variant="ghost" size="sm">Log in</Button>
             </Link>
             <Link href="/onboarding">
-              <Button size="sm">Get Started Free</Button>
+              <Button size="sm">Get Started</Button>
             </Link>
           </div>
         </div>
-      </header>
+      </motion.header>
 
-      {/* Hero Section — Headspace-inspired */}
-      <section className="blob-bg relative overflow-hidden">
-        <div className="max-w-6xl mx-auto px-4 py-20 md:py-32 relative z-10">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="animate-fade-in-up">
-              <h1 className="text-4xl md:text-6xl font-extrabold leading-tight tracking-tight">
-                Everything your{" "}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-warm)] animate-gradient">
-                  mind needs
-                </span>{" "}
-                to connect
-              </h1>
-              <p className="mt-6 text-lg text-[var(--color-text-muted)] max-w-xl leading-relaxed">
-                NeuroKin builds your Emotional Digital Twin to find peers who
-                truly understand you. Journal, check in, and discover
-                meaningful connections — backed by AI, protected by design.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-4">
-                <Link href="/onboarding">
-                  <Button size="lg">
-                    <Sparkles className="w-5 h-5" />
-                    Try for free
-                  </Button>
-                </Link>
-                <a href="#how-it-works">
-                  <Button variant="outline" size="lg">
-                    Learn more
-                  </Button>
-                </a>
-              </div>
-            </div>
-            <div className="relative hidden md:flex justify-center">
-              {/* Hero illustration — card mockup */}
-              <div className="relative w-80">
-                <div className="absolute -top-4 -left-8 w-24 h-24 rounded-full bg-[var(--color-primary)] opacity-20 blur-2xl" />
-                <div className="absolute -bottom-6 -right-6 w-32 h-32 rounded-full bg-[var(--color-accent)] opacity-20 blur-2xl" />
-                <div className="bg-white rounded-3xl shadow-xl border border-[var(--color-border)] p-6 transform rotate-2">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-300 to-orange-400 flex items-center justify-center text-xl">
-                      😊
-                    </div>
-                    <div>
-                      <div className="font-semibold text-sm">Your Emotional Twin</div>
-                      <div className="text-xs text-[var(--color-text-muted)]">Updated just now</div>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-[var(--color-text-muted)]">Mood Stability</span>
-                      <span className="font-semibold">82%</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full bg-slate-100">
-                      <div className="h-2 rounded-full bg-emerald-400" style={{ width: "82%" }} />
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-[var(--color-text-muted)]">Social Energy</span>
-                      <span className="font-semibold">67%</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full bg-slate-100">
-                      <div className="h-2 rounded-full bg-blue-400" style={{ width: "67%" }} />
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 pt-2">
-                      {["Reflective", "Creative", "Calm"].map((tag) => (
-                        <span
-                          key={tag}
-                          className="text-xs px-2.5 py-1 rounded-full bg-[var(--color-primary-light)] text-amber-800 font-medium"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white rounded-3xl shadow-xl border border-[var(--color-border)] p-4 mt-4 transform -rotate-1">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                      <Users className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-semibold">New Match: Alex T.</div>
-                      <div className="text-xs text-[var(--color-text-muted)]">87% compatible</div>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+      {/* ═══════════════ HERO: Digital Twin Visualization ═══════════════ */}
+      <section
+        ref={heroRef}
+        className="relative pt-28 pb-8 md:pt-36 md:pb-16 overflow-hidden"
+      >
+        {/* Background glow orbs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-amber-200/30 rounded-full blur-[120px]" />
+          <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-blue-200/25 rounded-full blur-[120px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-rose-100/20 rounded-full blur-[100px]" />
         </div>
-      </section>
 
-      {/* Category pills — Headspace style */}
-      <section className="py-16 bg-[var(--color-surface-soft)]">
-        <div className="max-w-4xl mx-auto px-4">
-          <h2 className="text-center text-xl font-bold mb-8">
-            What kind of connection are you looking for?
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 stagger">
-            {categories.map((cat) => (
-              <Link
-                key={cat.label}
-                href="/onboarding"
-                className="flex items-center justify-between px-5 py-4 bg-white rounded-xl border border-[var(--color-border)] card-hover"
-              >
-                <span className="text-sm font-medium">{cat.label}</span>
-                <span className="flex items-center gap-2">
-                  <span className="text-xl">{cat.emoji}</span>
-                  <ArrowRight className="w-4 h-4 text-[var(--color-text-muted)]" />
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features — "The emotionally aware platform" */}
-      <section id="features" className="py-20">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-extrabold">
-              The emotionally aware platform{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-warm)]">
-                for every student
+        <div className="max-w-6xl mx-auto px-4 relative z-10">
+          {/* Hero text */}
+          <motion.div
+            className="text-center mb-6 md:mb-10"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+          >
+            <motion.div
+              className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200/60 rounded-full px-4 py-1.5 text-sm font-medium text-amber-700 mb-6"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Sparkles className="w-4 h-4" />
+              AI-powered emotional connections
+            </motion.div>
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1] max-w-4xl mx-auto">
+              <span className="block">Your emotional</span>
+              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-[var(--color-warm)] animate-gradient">
+                digital twin
               </span>
-            </h2>
-            <div className="flex flex-wrap justify-center gap-3 mt-6">
-              {["Digital Twins", "AI Matching", "Emotional Resonance", "Privacy First", "Peer Discovery"].map(
-                (pill) => (
-                  <span
-                    key={pill}
-                    className="text-sm px-4 py-2 rounded-full border border-[var(--color-border)] bg-white font-medium"
+              <span className="block">finds your people</span>
+            </h1>
+            <p className="mt-6 text-lg md:text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed">
+              NeuroTwin builds a living model of your emotional self — then
+              matches you with peers who truly understand you.
+            </p>
+          </motion.div>
+
+          {/* ── TWIN VISUALIZATION ── */}
+          <motion.div
+            style={{ y: heroY }}
+            className="relative w-full max-w-[700px] mx-auto mt-8 md:mt-12"
+            /* Fixed aspect ratio container */
+          >
+            <div className="relative w-full" style={{ paddingBottom: "100%" }}>
+              <div className="absolute inset-0 flex items-center justify-center">
+                {/* Center glow pulse */}
+                <motion.div
+                  className="absolute w-48 h-48 md:w-56 md:h-56 rounded-full"
+                  style={{
+                    background:
+                      "radial-gradient(circle, rgba(249,168,37,0.18) 0%, transparent 70%)",
+                  }}
+                  animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.8, 0.5] }}
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                />
+
+                {/* Orbit ring */}
+                <motion.div
+                  className="absolute rounded-full border-2 border-dashed border-slate-200/40"
+                  style={{
+                    width: cloudRadius * 2 + 60,
+                    height: cloudRadius * 2 + 60,
+                  }}
+                  animate={{ rotate: 360 }}
+                  transition={{
+                    duration: 80,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                />
+
+                {/* Dashed connector lines */}
+                <ConnectorLines radius={cloudRadius} />
+
+                {/* Center DiceBear Thumb Avatar */}
+                <motion.div
+                  className="relative z-10"
+                  initial={{ opacity: 0, scale: 0.4 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{
+                    duration: 0.8,
+                    delay: 0.3,
+                    ease: [0.34, 1.56, 0.64, 1],
+                  }}
+                >
+                  <div className="w-32 h-32 md:w-44 md:h-44 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-warm)] p-1 shadow-2xl">
+                    <div className="w-full h-full rounded-full bg-white p-2 overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`${DICEBEAR_BASE}?seed=${heroSeed}&backgroundColor=fef3c7&scale=90`}
+                        alt="Your Digital Twin"
+                        className="w-full h-full rounded-full"
+                      />
+                    </div>
+                  </div>
+                  {/* Label pill */}
+                  <motion.div
+                    className="absolute -bottom-9 left-1/2 -translate-x-1/2 bg-white rounded-full px-4 py-1.5 shadow-lg border border-slate-100 whitespace-nowrap"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 1.6, duration: 0.5 }}
                   >
-                    {pill}
-                  </span>
-                )
-              )}
+                    <span className="text-xs font-bold text-slate-600 tracking-wide">
+                      Your Digital Twin
+                    </span>
+                  </motion.div>
+                </motion.div>
+
+                {/* Floating thought cloud factors */}
+                {twinFactors.map((factor, i) => (
+                  <ThoughtCloud
+                    key={factor.label}
+                    factor={factor}
+                    index={i}
+                    radius={cloudRadius}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="grid md:grid-cols-2 gap-6 stagger">
-            {features.map((f) => {
+          </motion.div>
+
+          {/* CTA */}
+          <motion.div
+            className="flex flex-wrap justify-center gap-4 mt-6 md:mt-10"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.8, duration: 0.6 }}
+          >
+            <Link href="/onboarding">
+              <Button size="lg">
+                <Sparkles className="w-5 h-5" />
+                Build Your Twin
+              </Button>
+            </Link>
+            <a
+              href="#how-it-works"
+              onClick={(e) => {
+                e.preventDefault();
+                scrollToSection("how-it-works");
+              }}
+            >
+              <Button variant="outline" size="lg">
+                See how it works
+              </Button>
+            </a>
+          </motion.div>
+        </div>
+      </section>
+
+      <div className="relative w-full">
+      {/* ═══════════════ FEATURES ═══════════════ */}
+      <section
+        id="features"
+        className="relative scroll-mt-24 bg-slate-50/50 py-20 md:py-0 md:h-screen md:sticky md:top-0 md:z-10 md:flex md:items-center md:shadow-xl"
+      >
+        <div className="max-w-6xl mx-auto px-4 w-full pb-5 md:pt-15 md:pb-13">
+          <FadeInWhenVisible>
+            <div className="text-center mb-16">
+              <span className="text-sm font-semibold text-[var(--color-primary)] uppercase tracking-wider">
+                Features
+              </span>
+              <h2 className="text-3xl md:text-5xl font-extrabold mt-3 tracking-tight">
+                The emotionally aware platform
+              </h2>
+              <p className="text-slate-500 mt-4 max-w-xl mx-auto text-lg">
+                Powered by AI that understands the nuances of human emotion —
+                not just keywords.
+              </p>
+            </div>
+          </FadeInWhenVisible>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {features.map((f, i) => {
               const Icon = f.icon;
               return (
-                <div
+                <FadeInWhenVisible
                   key={f.title}
-                  className="group bg-white rounded-2xl border border-[var(--color-border)] p-8 card-hover"
+                  delay={i * 0.1}
+                  direction={i % 2 === 0 ? "left" : "right"}
                 >
-                  <div
-                    className={`w-12 h-12 rounded-xl ${f.color} flex items-center justify-center mb-4`}
+                  <motion.div
+                    className={`${f.bg} rounded-3xl p-8 md:p-10 border border-white/60 h-full`}
+                    whileHover={{
+                      y: -6,
+                      boxShadow: "0 20px 60px rgba(0,0,0,0.08)",
+                    }}
+                    transition={{ duration: 0.3 }}
                   >
-                    <Icon className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-lg font-bold mb-2">{f.title}</h3>
-                  <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">
-                    {f.description}
-                  </p>
-                </div>
+                    <div
+                      className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${f.color} flex items-center justify-center mb-5 shadow-lg`}
+                    >
+                      <Icon className="w-7 h-7 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">{f.title}</h3>
+                    <p className="text-slate-500 leading-relaxed">
+                      {f.description}
+                    </p>
+                  </motion.div>
+                </FadeInWhenVisible>
               );
             })}
           </div>
         </div>
       </section>
 
-      {/* How it works */}
-      <section id="how-it-works" className="py-20 bg-gradient-to-b from-blue-50 to-white">
-        <div className="max-w-4xl mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-extrabold text-center mb-16">
-            How NeuroKin works
-          </h2>
-          <div className="space-y-12 stagger">
-            {howItWorks.map((item) => (
-              <div key={item.step} className="flex gap-6 items-start">
-                <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-[var(--color-primary)] text-white flex items-center justify-center text-lg font-bold">
-                  {item.step}
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold mb-1">{item.title}</h3>
-                  <p className="text-[var(--color-text-muted)] leading-relaxed">
-                    {item.description}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Social proof / testimonials — Headspace style */}
-      <section className="py-20">
-        <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-extrabold text-center mb-4">
-            Students are connecting in{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-warm)]">
-              deeper ways
-            </span>
-          </h2>
-          <p className="text-center text-[var(--color-text-muted)] mb-12 max-w-2xl mx-auto">
-            Built on emotional resonance, not just shared classes.
-          </p>
-          <div className="grid md:grid-cols-3 gap-6 stagger">
-            {[
-              {
-                quote:
-                  "I finally found someone who gets how I feel about school pressure. We journal together now.",
-                label: "On finding an emotionally compatible peer",
-              },
-              {
-                quote:
-                  "The icebreakers actually made sense — it wasn't awkward at all starting a conversation.",
-                label: "On AI-generated icebreakers",
-              },
-              {
-                quote:
-                  "Knowing my journals are private but still help me connect makes me feel safe.",
-                label: "On privacy-first design",
-              },
-            ].map((t, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-2xl border border-[var(--color-border)] p-6 card-hover flex flex-col justify-between"
-              >
-                <p className="text-sm leading-relaxed mb-6">
-                  &ldquo;{t.quote}&rdquo;
-                </p>
-                <p className="text-xs text-[var(--color-text-muted)]">
-                  {t.label}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Safety section */}
-      <section id="safety" className="py-20 bg-[var(--color-surface-soft)]">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <Shield className="w-12 h-12 text-emerald-600 mx-auto mb-4" />
-          <h2 className="text-3xl font-extrabold mb-4">
-            Designed by experts, delivered with care
-          </h2>
-          <p className="text-[var(--color-text-muted)] max-w-2xl mx-auto mb-8 leading-relaxed">
-            NeuroKin is built with FERPA & COPPA compliance in mind. Raw
-            journals are encrypted and never shared. You can opt out, block, or
-            report at any time. School-level moderation tools ensure safety.
-          </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            {[
-              "Encrypted journals",
-              "No raw data shared",
-              "Opt-out anytime",
-              "Block & report",
-              "FERPA ready",
-            ].map((item) => (
-              <span
-                key={item}
-                className="flex items-center gap-2 text-sm px-4 py-2 rounded-full bg-white border border-[var(--color-border)] font-medium"
-              >
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                {item}
+      {/* ═══════════════ HOW IT WORKS ═══════════════ */}
+      <section
+        id="how-it-works"
+        className="relative scroll-mt-24 z-20 bg-white/98 py-20 md:py-0 md:h-screen md:sticky md:top-0 md:flex md:items-center md:shadow-xl"
+      >
+        <div className="max-w-5xl mx-auto px-4 md:pt-20">
+          <FadeInWhenVisible>
+            <div className="text-center mb-16">
+              <span className="text-sm font-semibold text-blue-500 uppercase tracking-wider">
+                How it works
               </span>
-            ))}
+              <h2 className="text-3xl md:text-5xl font-extrabold mt-3 tracking-tight">
+                Three simple steps
+              </h2>
+            </div>
+          </FadeInWhenVisible>
+
+          <div className="space-y-8 md:space-y-0 md:grid md:grid-cols-3 md:gap-8">
+            {howItWorks.map((item, i) => {
+              const Icon = item.icon;
+              return (
+                <FadeInWhenVisible key={item.step} delay={i * 0.15}>
+                  <motion.div
+                    className="relative bg-white/90 rounded-3xl border border-slate-100 p-8 text-center shadow-sm h-full"
+                    whileHover={{ y: -6 }}
+                  >
+                    {/* Step watermark */}
+                    <div className="absolute top-4 right-6 text-6xl font-black text-slate-100 select-none">
+                      {item.step}
+                    </div>
+
+                    {/* DiceBear avatar */}
+                    <div className="relative mx-auto w-20 h-20 rounded-full bg-gradient-to-br from-slate-50 to-slate-100 mb-5 overflow-hidden border-2 border-white shadow-md">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`${DICEBEAR_BASE}?seed=${item.seed}&backgroundColor=e2e8f0&scale=85`}
+                        alt={item.title}
+                        className="w-full h-full"
+                      />
+                    </div>
+
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-warm)] flex items-center justify-center mx-auto mb-4 shadow-md">
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+
+                    <h3 className="text-lg font-bold mb-2">{item.title}</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed">
+                      {item.description}
+                    </p>
+
+                    {/* Arrow between cards */}
+                    {i < howItWorks.length - 1 && (
+                      <div className="hidden md:block absolute -right-5 top-1/2 -translate-y-1/2 z-10">
+                        <ArrowRight className="w-5 h-5 text-slate-300" />
+                      </div>
+                    )}
+                  </motion.div>
+                </FadeInWhenVisible>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-20 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-warm)] text-white">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-extrabold mb-4">
-            Ready to find your people?
-          </h2>
-          <p className="text-white/80 mb-8 max-w-lg mx-auto">
-            Start journaling, build your Emotional Twin, and discover
-            connections that actually matter.
-          </p>
-          <Link href="/onboarding">
-            <Button
-              variant="outline"
-              size="xl"
-              className="border-white text-white hover:bg-white hover:text-[var(--color-primary)]"
-            >
-              Get started — it&apos;s free
-              <ArrowRight className="w-5 h-5" />
-            </Button>
-          </Link>
+      {/* ═══════════════ MATCHING PREVIEW ═══════════════ */}
+      <section className="relative z-30 bg-gradient-to-b from-white to-slate-50 py-20 md:py-0 md:h-screen md:sticky md:top-0 md:flex md:items-center md:shadow-none">
+        <div className="max-w-6xl mx-auto px-4 md:pt-20">
+          <FadeInWhenVisible>
+            <div className="text-center mb-16">
+              <span className="text-sm font-semibold text-rose-500 uppercase tracking-wider">
+                Matching
+              </span>
+              <h2 className="text-3xl md:text-5xl font-extrabold mt-3 tracking-tight">
+                See who truly gets you
+              </h2>
+              <p className="text-slate-500 mt-4 max-w-xl mx-auto text-lg">
+                Each match includes a compatibility score and a personalized
+                icebreaker to get the conversation started.
+              </p>
+            </div>
+          </FadeInWhenVisible>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            {[
+              {
+                name: "Alex T.",
+                seed: "alex-m",
+                score: 87,
+                traits: ["Reflective", "Creative"],
+                icebreaker: "You both find peace in creative expression...",
+              },
+              {
+                name: "Sam W.",
+                seed: "sam-m",
+                score: 82,
+                traits: ["Empathetic", "Curious"],
+                icebreaker:
+                  "You share a deep appreciation for understanding others...",
+              },
+              {
+                name: "Casey L.",
+                seed: "casey-m",
+                score: 75,
+                traits: ["Adventurous", "Calm"],
+                icebreaker: "You both balance excitement with groundedness...",
+              },
+            ].map((match, i) => (
+              <FadeInWhenVisible key={match.name} delay={i * 0.12}>
+                <motion.div
+                  className="bg-white rounded-3xl border border-slate-100 p-6"
+                  whileHover={{
+                    y: -8,
+                  }}
+                >
+                  <div className="flex items-center gap-4 mb-4">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`${DICEBEAR_BASE}?seed=${match.seed}&backgroundColor=dbeafe&radius=50&scale=85`}
+                      alt={match.name}
+                      className="w-14 h-14 rounded-full border-2 border-slate-100"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-800">
+                        {match.name}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{
+                            backgroundColor:
+                              match.score > 80 ? "#10b981" : "#f59e0b",
+                          }}
+                        />
+                        <span className="font-semibold text-slate-600">
+                          {match.score}% compatible
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {match.traits.map((tr) => (
+                      <span
+                        key={tr}
+                        className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-medium"
+                      >
+                        {tr}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-sm text-slate-400 italic leading-relaxed">
+                    &ldquo;{match.icebreaker}&rdquo;
+                  </p>
+                </motion.div>
+              </FadeInWhenVisible>
+            ))}
+          </div>
+        </div>
+      </section>
+      </div>
+
+      {/* ═══════════════ TESTIMONIALS CAROUSEL ═══════════════ */}
+      <section
+        id="testimonials"
+        className="relative scroll-mt-24 z-40 bg-white py-20 md:py-32"
+      >
+        <div className="max-w-6xl mx-auto px-4">
+          <FadeInWhenVisible>
+            <div className="text-center mb-14">
+              <span className="text-sm font-semibold text-emerald-500 uppercase tracking-wider">
+                Stories
+              </span>
+              <h2 className="text-3xl md:text-5xl font-extrabold mt-3 tracking-tight">
+                Students are connecting{" "}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-warm)]">
+                  in deeper ways
+                </span>
+              </h2>
+            </div>
+          </FadeInWhenVisible>
+
+          <FadeInWhenVisible delay={0.2}>
+            <Carousel />
+          </FadeInWhenVisible>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 border-t border-[var(--color-border)]">
+      {/* ═══════════════ CTA ═══════════════ */}
+      <section className="py-24 md:py-32 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-primary)] via-orange-400 to-[var(--color-warm)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.15),transparent_50%)]" />
+
+        <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
+          <FadeInWhenVisible>
+            <motion.div
+              className="inline-block mb-8"
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 3, repeat: Infinity }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`${DICEBEAR_BASE}?seed=cta-twin&backgroundColor=ffffff&radius=50&scale=90`}
+                alt="Your Twin"
+                className="w-24 h-24 rounded-full border-4 border-white/30 shadow-2xl"
+              />
+            </motion.div>
+            <h2 className="text-3xl md:text-5xl font-extrabold mb-4 text-white">
+              Ready to find your people?
+            </h2>
+            <p className="text-white/80 mb-10 max-w-lg mx-auto text-lg">
+              Start journaling, build your Emotional Twin, and discover
+              connections that actually matter.
+            </p>
+            <Link href="/onboarding">
+              <Button
+                variant="outline"
+                size="xl"
+                className="border-white/40 text-white hover:bg-white hover:text-[var(--color-primary)] shadow-lg backdrop-blur-sm"
+              >
+                Get started — it&apos;s free
+                <ArrowRight className="w-5 h-5" />
+              </Button>
+            </Link>
+          </FadeInWhenVisible>
+        </div>
+      </section>
+
+      {/* ═══════════════ FOOTER ═══════════════ */}
+      <footer className="py-12 border-t border-slate-100">
         <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-warm)] flex items-center justify-center">
               <Brain className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold">NeuroKin</span>
+            <span className="font-bold">NeuroTwin</span>
           </div>
-          <p className="text-sm text-[var(--color-text-muted)]">
-            &copy; 2026 NeuroKin. Emotionally intelligent student connections.
+          <p className="text-sm text-slate-400">
+            &copy; 2026 NeuroTwin. Emotionally intelligent student connections.
           </p>
         </div>
       </footer>
-    </div>
+    </main>
   );
 }

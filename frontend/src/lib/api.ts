@@ -1,4 +1,4 @@
-// NeuroKin API client
+// NeuroTwin API client
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function parseResponse<T>(res: Response): Promise<T> {
@@ -7,6 +7,32 @@ async function parseResponse<T>(res: Response): Promise<T> {
     throw new Error(`API ${res.status}: ${payload}`);
   }
   return res.json() as Promise<T>;
+}
+
+// --- Auth ---
+
+export interface AuthResponse {
+  status: string;
+  student_id: string;
+  display_name: string;
+}
+
+export async function signup(studentId: string, displayName: string, password: string, school: string = ""): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ student_id: studentId, display_name: displayName, password, school }),
+  });
+  return parseResponse(res);
+}
+
+export async function login(studentId: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ student_id: studentId, password }),
+  });
+  return parseResponse(res);
 }
 
 export interface JournalEntry {
@@ -98,6 +124,68 @@ export async function reportUser(studentId: string, reportedId: string, reason: 
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ student_id: studentId, reported_id: reportedId, reason }),
+  });
+  return parseResponse(res);
+}
+
+// --- Additional API functions ---
+
+export interface JournalEntryPreview {
+  text: string;
+  mood_label: string | null;
+  tags: string[];
+  created_at: string;
+}
+
+export interface MoodHistoryEntry {
+  mood_label: string;
+  energy_level: number;
+  stress_level: number;
+  social_battery: number;
+  created_at: string;
+}
+
+export async function getJournalEntries(studentId: string, limit = 20): Promise<JournalEntryPreview[]> {
+  const res = await fetch(`${API_BASE}/journal?student_id=${studentId}&limit=${limit}`);
+  return parseResponse(res);
+}
+
+export async function getMoodHistory(studentId: string, limit = 7): Promise<MoodHistoryEntry[]> {
+  const res = await fetch(`${API_BASE}/mood/history?student_id=${studentId}&limit=${limit}`);
+  return parseResponse(res);
+}
+
+export async function deleteAccount(studentId: string): Promise<{ status: string; deleted: string }> {
+  const res = await fetch(`${API_BASE}/account?student_id=${studentId}`, {
+    method: "DELETE",
+  });
+  return parseResponse(res);
+}
+
+export async function submitConsent(studentId: string, consented: boolean): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/consent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ student_id: studentId, consented }),
+  });
+  return parseResponse(res);
+}
+
+export async function submitActivity(
+  studentId: string,
+  activityType: string,
+  description?: string,
+  durationMins?: number,
+): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/activity`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      student_id: studentId,
+      activity_type: activityType,
+      description,
+      duration_mins: durationMins,
+    }),
   });
   return parseResponse(res);
 }
